@@ -26,6 +26,10 @@ public class CrawlConfig {
         return maxDepth;
     }
 
+    public int maxPages(){
+        return maxPages;
+    }
+
     public int threadCount(){
         return threadCount;
     }
@@ -49,7 +53,7 @@ public class CrawlConfig {
                 + ", maxDurationMinutes=" + maxDurationMinutes + "}";
     }
 
-    public static final class Builder() {
+    public static final class Builder {
         private int maxDepth = 3;
         private int maxPages = 100;
         private int threadCount = 4;
@@ -58,48 +62,39 @@ public class CrawlConfig {
         private String urlStoragePath = null;
 
         private Builder() {
+        }
 
-            private int maxDepth = 3;
-            private int maxPages = 100;
-            private int threadCount = 4;
-            private Set<String> allowedDomains = Set.of();
-            private int maxDurationMinutes = 60;
-            private String urlStoragePath = null;
+        public Builder maxDepth(int value) {
+            this.maxDepth = value;
+            return this;
+        }
 
-            private Builder() {
-            }
+        public Builder maxPages(int value){
+            this.maxPages = value;
+            return this;
+        }
 
-            public Builder maxDepth(int value) {
-                this.maxDepth = value;
-                return this;
-            }
+        public Builder threadCount(int value){
+            this.threadCount = value;
+            return this;
+        }
 
-            public Builder maxPages(int value){
-                this.maxPages = value;
-                return this;
-            }
+        public Builder allowedDomains(Set<String> value) {
+            this.allowedDomains = value == null ? Set.of() : value;
+            return this;
+        }
 
-            public Builder threadCount(int value){
-                this.maxPages = value;
-                return this;
-            }
+        public Builder maxDurationMinutes(int value) {
+            this.maxDurationMinutes = value;
+            return this;
+        }
 
-            public Builder allowedDomains(Set<String> value) {
-                this.allowedDomains = value == null ? Set.of() : value;
-                return this;
-            }
+        public Builder urlStoragePath(String value) {
+            this.urlStoragePath = value == null || value.isBlank() ? null : value;
+            return this;
+        }
 
-            public Builder maxDurationMinutes(int value) {
-                this.maxDurationMinutes = value;
-                return this;
-            }
-
-            public Builder urlStoragePath(String value) {
-                this.urlStoragePath = value == null || value.isBlank() ? null : value;
-                return this;
-            }
-
-            public CrawlConfig build() {
+        public CrawlConfig build() {
             if (maxPages <= 0) {
                 throw new IllegalArgumentException("maxPages must be > 0, " + maxPages);
             }
@@ -114,7 +109,6 @@ public class CrawlConfig {
                         "maxDurationMinutes must be > 0," + maxDurationMinutes);
             }
             return new CrawlConfig(this);
-        }
         }
     }
 }

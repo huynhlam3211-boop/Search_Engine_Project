@@ -1,10 +1,10 @@
 package com.vnsearch.crawler;
 
-public class CrawlListener {
+public interface CrawlListener {
     default void onPageCrawled(CrawlEvent event){
     }
 
-    default void orError(String url, Exception error) {
+    default void onError(String url, Exception error) {
     }
 
     default void onDuplicateContent(String url) {
@@ -13,6 +13,6 @@ public class CrawlListener {
     default void onFinished(int totalPages , long elapsedMs) {
     }
 
-    record CrawEvent(int pageNumber, int maxPages, String url, int depth, int outlinks, int frontierSize, int domainCount) {
+    record CrawlEvent(int pageNumber, int maxPages, String url, int depth, int outlinks, int frontierSize, int domainCount) {
     }
 }

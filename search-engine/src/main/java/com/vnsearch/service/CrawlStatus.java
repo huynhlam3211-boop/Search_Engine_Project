@@ -1,6 +1,6 @@
 package com.vnsearch.service;
 
-public class CrawlStatus {
+public enum CrawlStatus {
 
     STARTED {
         @Override
@@ -11,7 +11,7 @@ public class CrawlStatus {
 
     RUNNING {
         @Override
-        public boolean canTrasitionTo(CrawlStatus next) {
+        public boolean canTransitionTo(CrawlStatus next) {
             return next == DONE || next == FAILED;
         }
     },
@@ -34,5 +34,5 @@ public class CrawlStatus {
     public boolean isTerminal() {
         return this == DONE || this == FAILED;
     }
-    
+
 }
