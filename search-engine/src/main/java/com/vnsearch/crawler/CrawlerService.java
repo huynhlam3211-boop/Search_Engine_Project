@@ -30,6 +30,18 @@ public class CrawlerService {
         return contentStorage.all();
     }
 
+    private void seed(List<String> seedUrls) {
+        for (String seed: seedUrls) {
+            String url = UrlCanonicalizer.canonicalize(seed);
+            if (!urlFilter.accept(url,0)) {
+                log.warn("Seed bị URL Filter loại, bỏ qua: {}", seed);
+                continue;
+            }
+            urlSeenFilter.markSeenIFNew(url);
+            frontier.addUrl(url, 0, SEED_BACKLINK_SCORE);
+        }
+    }
+
     private final List<CrawlListener> listeners = new CopyOnWriteArrayList<>();
     public CrawlerService addListener(CrawlListener listener) {
         if (listener != null ) {
