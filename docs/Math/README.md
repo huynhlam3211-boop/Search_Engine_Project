@@ -10,7 +10,7 @@ Tài liệu này quét **toàn bộ mã nguồn** của dự án và tổng hợ
 - **Chủ đề DSA** mà đoạn code đó thể hiện
 - **Hạn chế đã biết**, nói thẳng
 
-**36 tài liệu** phân tích mã nguồn, chia theo 7 nhóm, cộng **15 tài liệu** về design pattern, OOP và chấm điểm ở nhóm 9.
+**37 tài liệu** phân tích mã nguồn, chia theo 7 nhóm, cộng **15 tài liệu** về design pattern, OOP và chấm điểm ở nhóm 9.
 
 > 🗺️ **Mỗi nhóm đều mở đầu bằng một SƠ ĐỒ TƯ DUY** — vẽ ra mối liên hệ giữa các file của cả tầng đó thành hình, kèm bảng tra nhanh từng file và bảng *"xoá file này thì hỏng gì"*. **Đọc sơ đồ tư duy của nhóm trước, rồi mới vào các trang đi sâu.** Mọi sơ đồ đều có sẵn bản chữ (ASCII) bấm mở được, phòng khi trình xem không hiển thị Mermaid.
 
@@ -95,6 +95,7 @@ Mọi ký hiệu lạ xuất hiện trong 35 tài liệu phân tích mã nguồn
 
 | Tài liệu | File nguồn | Nội dung chính |
 |---|---|---|
+| [**Hai nhánh điều hướng**](08-frontend/HAI-NHANH-DIEU-HUONG.md) | `AddressBar.tsx`, `tabStore.ts`, `tabManager.ts` | **Bắt đầu từ đây.** Gõ `youtube.com` thì Chromium tải trang — search engine **không** tham gia; gõ từ khoá mới gọi API. Chuỗi renderer → preload → IPC → main, `WebContentsView` là lớp native không tuân theo CSS |
 | [Stack](08-frontend/Stack.md) | `lib/Stack.ts`, `store/historyStore.ts` | **Hai ngăn xếp + bất biến back/forward**, cờ một lần dùng cắt vòng phản hồi |
 | [BookmarkTrie](08-frontend/BookmarkTrie.md) | `lib/BookmarkTrie.ts` | **Cùng cấu trúc, hai chuyên biệt hoá** — so sánh chi tiết Java vs TypeScript |
 
@@ -288,7 +289,7 @@ Tài liệu bao phủ **mọi file có nội dung toán học hoặc thuật to�
 - **Runner / script**: `MultiDomainCrawlRunner`, `EvaluationRunner`, `QrelsEvaluationRunner`, `PostgresImportRunner`, `GinBaselineRunner` — điều phối và sinh báo cáo, không có thuật toán riêng
 - **Lớp keo dán**: `SearchEngineFacade` (phân tích ở [CHAM-DIEM §2.3](09-design-patterns/CHAM-DIEM.md) và [11-MAU-BO-TRO §1](09-design-patterns/11-MAU-BO-TRO.md)), `EvaluationHarness` (ở [PoolBuilder §2](07-eval/PoolBuilder.md))
 - **Truy cập CSDL**: `DocumentRepository` — CRUD JDBC chuẩn, phần GIN đã có `docs/GIN-BASELINE.md` riêng
-- **Frontend**: `tabManager.ts`, `ipcHandlers.ts`, các store Zustand — bố cục UI và IPC
+- **Frontend**: các store Zustand còn lại — bố cục UI thuần. Riêng `tabManager.ts` + `ipcHandler.ts` + `preload/index.ts` **đã có trang** ở [Hai nhánh điều hướng](08-frontend/HAI-NHANH-DIEU-HUONG.md) vì chúng chứa quyết định kiến trúc thật (hai lớp `WebContentsView`, ranh giới sandbox)
 - **Interface thuần và lớp thực thi mẫu thiết kế**: `Tokenizer`, `SearchIndex`, `DocumentStore`, `CandidateFilter`, `QueryNode` + 5 nút, `PostingCursor`, `CrawlListener`, `ScorerFactory`, `CrawlStatus`, `CrawlConfig`, hai Decorator, hai Filter, `IndexBuilder`, `SuggestionService`, `CrawlJobManager`, `LanguageDetector`, `SnippetBuilder` — chúng **không chứa toán học mới**, nhưng mỗi cái có một trang riêng trong [`09-design-patterns/`](09-design-patterns/README.md) phân tích **vấn đề thiết kế** mà nó giải
 
 **Đối chiếu nhanh — mọi file `.java` có nội dung thuật toán đều đã có trang:**
@@ -301,7 +302,7 @@ Tài liệu bao phủ **mọi file có nội dung toán học hoặc thuật to�
 | `query/` | PostingListMerger, QueryParser, CandidateResolver — **3/3** ✅ |
 | `ranking/` | TfIdfScorer, BM25Scorer, PageRankService, ResultRanker, QuerySyllables — **5/5** ✅ |
 | `eval/` | EvaluationMetrics, KnownItemQueryGenerator, PoolBuilder — **3/3** ✅ |
-| Frontend | Stack, BookmarkTrie — **2/2** ✅ |
+| Frontend | Stack, BookmarkTrie — **2/2** ✅<br/>Thêm [Hai nhánh điều hướng](08-frontend/HAI-NHANH-DIEU-HUONG.md) cho `AddressBar.tsx` + `tabManager.ts` + lớp IPC |
 
 ---
 

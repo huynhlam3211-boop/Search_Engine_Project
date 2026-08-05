@@ -8,9 +8,6 @@ REM      docker compose up -d --build
 REM ===========================================================================
 setlocal
 
-echo.
-echo === VnSearch - trinh duyet (chi frontend) ===
-echo.
 
 REM --- 1. Ve dung thu muc frontend ---
 REM %~dp0 la thu muc chua file .bat nay (da co dau \ o cuoi), nen chay duoc
@@ -63,8 +60,7 @@ if not exist "node_modules" (
 REM --- 4. Chay Electron ---
 REM Backend chua chay thi trinh duyet van mo binh thuong, chi la o tim kiem
 REM se bao loi khi goi API. Do la chuyen cua backend, khong phai cua file nay.
-echo.
-echo Dang khoi dong Electron... ^(dong cua so nay de dung^)
+
 echo.
 call npm run dev
 if errorlevel 1 goto :fail

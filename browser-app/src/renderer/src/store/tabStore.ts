@@ -1,10 +1,18 @@
-import { create } from './createStore'
+import { create } from 'zustand'
 import { useHistoryStore } from './historyStore'
+import { useSearchViewStore } from './searchViewStore'
 
-/** Phai trung voi HOME_URL trong src/main/tabManager.ts. */
 export const HOME_URL = 'vnsearch://home'
 
-export interface TabState {
+export interface TabInfo {
+  id: string
+  url: string
+  title: string
+  loading: boolean
+}
+
+/** Khop voi TabState gui tu main process (main/tabManager.ts) qua browser:tabUpdate. */
+interface TabUpdatePayload {
   id: string
   url: string
   title: string
@@ -13,71 +21,121 @@ export interface TabState {
   canGoForward: boolean
 }
 
-interface TabStore {
-  tabs: TabState[]
+interface TabStoreState {
+  tabs: TabInfo[]
   activeTabId: string | null
+  initialized: boolean
   init: () => void
-  createTab: (url?: string) => void
-  closeTab: (id: string) => void
-  switchTab: (id: string) => void
-  /** Mo URL trong tab dang hoat dong. */
-  navigate: (url: string) => void
-  goBack: () => void
-  goForward: () => void
+  newTab: (url?: string) => Promise<void>
+  closeTab: (id: string) => Promise<void>
+  switchTab: (id: string) => Promise<void>
+  navigate: (url: string) => Promise<void>
+  goBack: () => Promise<void>
+  goForward: () => Promise<void>
   reload: () => void
-  goHome: () => void
+  canGoBack: () => boolean
+  canGoForward: () => boolean
 }
 
-export const useTabStore = create<TabStore>((set, get) => ({
+export const useTabStore = create<TabStoreState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  initialized: false,
 
   init: () => {
-    // Main process la nguon su that duy nhat ve tab: renderer chi nghe va ve lai.
-    window.browser.onTabsChanged(({ tabs, activeTabId }) => {
-      const active = tabs.find((t) => t.id === activeTabId)
-      // Ghi lich su khi trang da tai xong, luc do title moi dung.
-      if (active && active.url !== HOME_URL && !active.loading) {
-        useHistoryStore.getState().add(active.url, active.title)
+    if (get().initialized) {
+      return
+    }
+    set({ initialized: true })
+
+    const applyTabUpdate = (tab: TabUpdatePayload): void => {
+      const history = useHistoryStore.getState()
+      history.ensureTab(tab.id, tab.url)
+      history.recordNavigation(tab.id, tab.url)
+
+      set((state) => {
+        const idx = state.tabs.findIndex((t) => t.id === tab.id)
+        const info: TabInfo = { id: tab.id, url: tab.url, title: tab.title, loading: tab.loading }
+        const tabs =
+          idx >= 0 ? state.tabs.map((t, i) => (i === idx ? info : t)) : [...state.tabs, info]
+        return { tabs, activeTabId: state.activeTabId ?? tab.id }
+      })
+    }
+
+    window.browser.onTabUpdate((payload) => applyTabUpdate(payload as TabUpdatePayload))
+
+    // Tab dau tien (trang home) duoc TabManager tao TRONG constructor, tuc
+    // la truoc khi dong ipcRenderer.on o tren kip dang ky - nen goi push
+    // dau tien qua browser:tabUpdate bi mat (send khong hang doi). Vi vay
+    // PHAI chu dong keo (pull) danh sach tab hien tai ngay sau khi mount.
+    window.browser.listTabs().then((tabs) => {
+      for (const tab of tabs as TabUpdatePayload[]) {
+        applyTabUpdate(tab)
       }
-      set({ tabs, activeTabId })
     })
-    window.browser.listTabs().then(({ tabs, activeTabId }) => set({ tabs, activeTabId }))
   },
 
-  createTab: (url) => {
-    window.browser.createTab(url)
-  },
-  closeTab: (id) => {
-    window.browser.closeTab(id)
-  },
-  switchTab: (id) => {
-    window.browser.switchTab(id)
+  newTab: async (url) => {
+    useSearchViewStore.getState().setQuery(null)
+    const id = await window.browser.newTab(url ?? HOME_URL)
+    set({ activeTabId: id })
   },
 
-  navigate: (url) => {
-    const id = get().activeTabId
-    if (id) window.browser.navigate(id, url)
+  closeTab: async (id) => {
+    await window.browser.closeTab(id)
+    useHistoryStore.getState().removeTab(id)
+    set((state) => ({ tabs: state.tabs.filter((t) => t.id !== id) }))
   },
-  goBack: () => {
-    const id = get().activeTabId
-    if (id) window.browser.goBack(id)
+
+  switchTab: async (id) => {
+    await window.browser.switchTab(id)
+    set({ activeTabId: id })
   },
-  goForward: () => {
-    const id = get().activeTabId
-    if (id) window.browser.goForward(id)
+
+  navigate: async (url) => {
+    const { activeTabId } = get()
+    if (!activeTabId) {
+      return
+    }
+    await window.browser.navigate(activeTabId, url)
   },
+
+  goBack: async () => {
+    const { activeTabId } = get()
+    if (!activeTabId) {
+      return
+    }
+    const prevUrl = useHistoryStore.getState().goBack(activeTabId)
+    if (prevUrl !== undefined) {
+      await window.browser.navigate(activeTabId, prevUrl)
+    }
+  },
+
+  goForward: async () => {
+    const { activeTabId } = get()
+    if (!activeTabId) {
+      return
+    }
+    const nextUrl = useHistoryStore.getState().goForward(activeTabId)
+    if (nextUrl !== undefined) {
+      await window.browser.navigate(activeTabId, nextUrl)
+    }
+  },
+
   reload: () => {
-    const id = get().activeTabId
-    if (id) window.browser.reload(id)
+    const { activeTabId } = get()
+    if (activeTabId) {
+      window.browser.reload(activeTabId)
+    }
   },
-  goHome: () => {
-    const id = get().activeTabId
-    if (id) window.browser.navigate(id, HOME_URL)
+
+  canGoBack: () => {
+    const { activeTabId } = get()
+    return !!activeTabId && useHistoryStore.getState().canGoBack(activeTabId)
+  },
+
+  canGoForward: () => {
+    const { activeTabId } = get()
+    return !!activeTabId && useHistoryStore.getState().canGoForward(activeTabId)
   }
 }))
-
-export function getActiveTab(): TabState | undefined {
-  const { tabs, activeTabId } = useTabStore.getState()
-  return tabs.find((t) => t.id === activeTabId)
-}
