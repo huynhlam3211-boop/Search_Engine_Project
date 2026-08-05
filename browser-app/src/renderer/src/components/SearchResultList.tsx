@@ -1,31 +1,29 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import type { JSX } from 'react'
+import { useSearchViewStore } from '../store/searchViewStore'
+import { useTabStore } from '../store/tabStore'
 
-function lookslikeUrl(text: string): boolean {
-
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }
 
-function AddressBar(): JSX.Element {
+function SearchResultList(): JSX.Element {
+  const query = useSearchViewStore((s) => s.query)
+  const results = useSearchViewStore((s) => s.results)
+  const total = useSearchViewStore((s) => s.total)
+  const tookMs = useSearchViewStore((s) => s.tookMs)
+  const status = useSearchViewStore((s) => s.status)
+  const error = useSearchViewStore((s) => s.error)
+  const usedMock = useSearchViewStore((s) => s.usedMock)
+  const navigate = useTabStore((s) => s.navigate)
 
-
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
+  return (
+    <div className="serp">
+    </div>
+  )
 }
 
-export default AddressBar
+export default SearchResultList

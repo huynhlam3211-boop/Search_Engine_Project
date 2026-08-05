@@ -20,6 +20,10 @@ function createWindow(): void {
   const tabManager = new TabManager(mainWindow)
   registerIpcHandlers(tabManager)
   registerWindowControls(mainWindow)
+
+  // BrowserWindow nay khong tu nap trang nao nen se khong bao gio phat
+  // 'ready-to-show'; phai doi chromeView nap xong roi moi hien cua so.
+  tabManager.onChromeReady(() => mainWindow.show())
 }
 
 app.whenReady().then(() => {

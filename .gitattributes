@@ -1,0 +1,7 @@
+# cmd.exe chi doc duoc batch file co line ending CRLF.
+# Neu bi checkout ra LF thi cmd nuot mat ky tu dau dong ('REM' -> 'M').
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell script thi nguoc lai, bat buoc LF.
+*.sh text eol=lf

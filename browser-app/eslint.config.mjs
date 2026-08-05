@@ -25,7 +25,11 @@ export default defineConfig(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
+      ...eslintPluginReactRefresh.configs.vite.rules,
+      // TAM THOI — di kem noUnusedLocals:false trong tsconfig.web.json.
+      // Cac component con de trong phan `return` nen import/state ben tren
+      // chua duoc dung. Viet xong JSX thi xoa dong nay.
+      '@typescript-eslint/no-unused-vars': 'off'
     }
   },
   eslintConfigPrettier

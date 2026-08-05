@@ -1,31 +1,21 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import type { JSX } from 'react'
+import { GlobeIcon, SearchIcon } from './icon'
 
-function lookslikeUrl(text: string): boolean {
-
+interface Props {
+  items: string[]
+  highlighted: number
+  onPick: (value: string) => void
+  onHover: (index: number) => void
 }
 
-function AddressBar(): JSX.Element {
+function AutocompleteDropdown({ items, highlighted, onPick, onHover }: Props): JSX.Element | null {
+  if (items.length === 0) return null
 
-
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
+  return (
+    <ul className="acdrop" role="listbox">
+      
+    </ul>
+  )
 }
 
-export default AddressBar
+export default AutocompleteDropdown

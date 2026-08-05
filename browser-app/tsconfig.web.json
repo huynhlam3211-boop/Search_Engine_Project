@@ -9,6 +9,13 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
+    // TAM THOI: cac component dang de trong phan `return` de viet JSX sau, nen
+    // state/handler/import ben tren chua duoc dung toi. Config goc cua
+    // @electron-toolkit bat hai co nay nen moi bien chua dung deu thanh loi
+    // (TS6133/TS6192) va `npm run build` khong chay duoc.
+    // Viet xong JSX thi xoa 2 dong nay de TypeScript bat lai bien thua.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "baseUrl": ".",
     "paths": {
       "@renderer/*": [

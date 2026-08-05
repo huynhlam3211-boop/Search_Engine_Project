@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type JSX } from 'react'
 import TabBar from './components/TabBar'
 import Toolbar from './components/Toolbar'
 import BookmarksBar from './components/BookmarksBar'
@@ -12,7 +12,7 @@ import { useOverlayStore } from './store/overlayStore'
 import { useSidePanelStore, PANEL_WIDTH } from './store/sidePanelStore'
 import { useBrowserShortcuts } from './lib/useBrowserShortcuts'
 
-function App() {
+function App(): JSX.Element {
   const init = useTabStore((s) => s.init)
   const showInternalContent = useTabStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeTabId)
@@ -29,6 +29,7 @@ function App() {
     init()
   }, [init])
 
+  // Main process can biet ben phai con bao nhieu cho de dat lai WebContentsView.
   useEffect(() => {
     window.browser.setPanelWidth(panelWidth)
   }, [panelWidth])
@@ -38,13 +39,13 @@ function App() {
   }, [hasOverlay])
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-chrome text-ink">
+    <div className="app">
       <TabBar />
       <Toolbar />
       <BookmarksBar />
 
-      <div className="flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1 bg-surface">
+      <div className="app__body">
+        <main className="app__content">
           {showInternalContent && (hasQuery ? <SearchResultList /> : <NewTabPage />)}
         </main>
         <SidePanel />

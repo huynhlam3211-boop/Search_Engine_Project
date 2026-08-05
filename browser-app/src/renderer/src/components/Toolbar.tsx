@@ -1,31 +1,25 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import { useState, type JSX } from 'react'
+import NavigationButtons from './NavigationButtons'
+import AddressBar from './AddressBar'
+import BrowserMenu from './BrowserMenu'
+import { MenuIcon } from './icon'
 
-function lookslikeUrl(text: string): boolean {
+function Toolbar(): JSX.Element {
+  const [menuOpen, setMenuOpen] = useState(false)
 
+  return (
+    <div className="toolbar">
+      <NavigationButtons />
+      <AddressBar />
+
+      <div className="toolbar__end">
+        <button type="button" title="Tuỳ chọn" onClick={() => setMenuOpen((v) => !v)}>
+          <MenuIcon />
+        </button>
+        <BrowserMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      </div>
+    </div>
+  )
 }
 
-function AddressBar(): JSX.Element {
-
-
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
-}
-
-export default AddressBar
+export default Toolbar

@@ -1,31 +1,21 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import type { JSX } from 'react'
+import { useBookmarkStore } from '../store/bookmarkStore'
+import { useTabStore } from '../store/tabStore'
+import { SEED_SITES } from '../lib/seedSites'
+import { BookmarkIcon, GlobeIcon } from './icon'
 
-function lookslikeUrl(text: string): boolean {
+function BookmarksBar(): JSX.Element {
+  const items = useBookmarkStore((s) => s.items)
+  const navigate = useTabStore((s) => s.navigate)
 
+  // Chua co dau trang nao thi hien tam vai trang goc cho thanh do trong.
+  const showSeeds = items.length === 0
+
+  return (
+    <div className="bmbar">
+      
+    </div>
+  )
 }
 
-function AddressBar(): JSX.Element {
-
-
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
-}
-
-export default AddressBar
+export default BookmarksBar

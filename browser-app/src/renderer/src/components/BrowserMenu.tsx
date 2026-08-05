@@ -1,31 +1,29 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import type { JSX } from 'react'
+import Popover from './Popover'
+import { useTabStore, HOME_URL } from '../store/tabStore'
+import { useSidePanelStore } from '../store/sidePanelStore'
+import { ACCOUNT } from '../lib/account'
 
-function lookslikeUrl(text: string): boolean {
-
+interface Props {
+  open: boolean
+  onClose: () => void
 }
 
-function AddressBar(): JSX.Element {
+function BrowserMenu({ open, onClose }: Props): JSX.Element {
+  const createTab = useTabStore((s) => s.createTab)
+  const activeTabId = useTabStore((s) => s.activeTabId)
+  const toggle = useSidePanelStore((s) => s.toggle)
 
+  const run = (fn: () => void): (() => void) => () => {
+    fn()
+    onClose()
+  }
 
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
+  return (
+    <Popover open={open} onClose={onClose}>
+      
+    </Popover>
+  )
 }
 
-export default AddressBar
+export default BrowserMenu

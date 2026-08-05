@@ -1,31 +1,21 @@
-import {useEffect, useRef, useState} from 'react'
-import {useTabStore, HOME_URL} from '../store/tabStore'
-import {useBookmarkStore} from '../store/bookmarkStore'
-import {useSearchViewScore} from '../store/searchViewStore'
-import AutocompleteDropdown from './AutocompleteDropdown'
-import {suggest} from '../lib/searchApi'
-import {CloseIcon, GlobeIcon, LockIcon, TransitionStartFunction, VnSearchMark} from './icon'
+import type { JSX } from 'react'
+import { useTabStore } from '../store/tabStore'
+import { BackIcon, ForwardIcon, HomeIcon, ReloadIcon } from './icon'
 
-function lookslikeUrl(text: string): boolean {
+function NavigationButtons(): JSX.Element {
+  const tabs = useTabStore((s) => s.tabs)
+  const activeTabId = useTabStore((s) => s.activeTabId)
+  const goBack = useTabStore((s) => s.goBack)
+  const goForward = useTabStore((s) => s.goForward)
+  const reload = useTabStore((s) => s.reload)
+  const goHome = useTabStore((s) => s.goHome)
 
+  const active = tabs.find((t) => t.id === activeTabId)
+
+  return (
+    <div className="navbtns">
+    </div>
+  )
 }
 
-function AddressBar(): JSX.Element {
-
-
-
- function handleKeyDown(): void {
-
- }
-
- function handleSubmit(e: React.FormEvent): void {
-
- }
-
- return (
-
- ) 
-
-}
-
-export default AddressBar
+export default NavigationButtons
