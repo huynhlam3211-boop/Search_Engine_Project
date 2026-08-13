@@ -6,7 +6,7 @@ import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
+  { ignores: ['**/node_modules', '**/dist', '**/out', 'strip-comments.mjs'] },
   tseslint.configs.recommended,
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat['jsx-runtime'],
@@ -25,11 +25,7 @@ export default defineConfig(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules,
-      // TAM THOI — di kem noUnusedLocals:false trong tsconfig.web.json.
-      // Cac component con de trong phan `return` nen import/state ben tren
-      // chua duoc dung. Viet xong JSX thi xoa dong nay.
-      '@typescript-eslint/no-unused-vars': 'off'
+      ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
   eslintConfigPrettier

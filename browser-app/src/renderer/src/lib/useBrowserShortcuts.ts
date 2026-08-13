@@ -1,87 +1,96 @@
 import { useEffect } from 'react'
 import { useTabStore, HOME_URL } from '../store/tabStore'
 import { useBookmarkStore } from '../store/bookmarkStore'
+import { useSearchViewStore } from '../store/searchViewStore'
 
-/** O dia chi mang id nay de phim tat Ctrl+L / Alt+D goi den duoc. */
-export const OMNIBOX_ID = 'vnsearch-omnibox'
+export type ShortcutName =
+  'newTab' | 'closeTab' | 'focusOmnibox' | 'reload' | 'back' | 'forward' | 'bookmark' | 'home'
 
-function focusOmnibox(): void {
-  const input = document.getElementById(OMNIBOX_ID) as HTMLInputElement | null
-  input?.focus()
-  input?.select()
+export function shortcutFromEvent(event: {
+  key: string
+  ctrlKey: boolean
+  altKey: boolean
+  shiftKey: boolean
+}): ShortcutName | null {
+  const key = event.key.toLowerCase()
+
+  if (event.ctrlKey && !event.altKey && !event.shiftKey) {
+    if (key === 't') return 'newTab'
+    if (key === 'w') return 'closeTab'
+    if (key === 'l') return 'focusOmnibox'
+    if (key === 'd') return 'bookmark'
+    if (key === 'r') return 'reload'
+  }
+  if (event.altKey && !event.ctrlKey) {
+    if (key === 'd') return 'focusOmnibox'
+    if (key === 'arrowleft') return 'back'
+    if (key === 'arrowright') return 'forward'
+    if (key === 'home') return 'home'
+  }
+  if (key === 'f5' && !event.ctrlKey && !event.altKey) {
+    return 'reload'
+  }
+  return null
 }
 
-function runShortcut(name: string): void {
-  const tabs = useTabStore.getState()
-  const active = tabs.tabs.find((t) => t.id === tabs.activeTabId)
+function runShortcut(name: ShortcutName): void {
+  const tabStore = useTabStore.getState()
+  const activeTab = tabStore.tabs.find((tab) => tab.id === tabStore.activeTabId)
 
   switch (name) {
     case 'newTab':
-      tabs.createTab()
-      focusOmnibox()
+      tabStore.newTab()
       break
     case 'closeTab':
-      if (tabs.activeTabId) tabs.closeTab(tabs.activeTabId)
+      if (tabStore.activeTabId) {
+        tabStore.closeTab(tabStore.activeTabId)
+      }
       break
-    case 'focusOmnibox':
-      focusOmnibox()
+    case 'focusOmnibox': {
+      const omnibox = document.getElementById('omnibox')
+      if (omnibox instanceof HTMLInputElement) {
+        omnibox.focus()
+        omnibox.select()
+      }
       break
+    }
     case 'reload':
-      tabs.reload()
+      tabStore.reload()
       break
     case 'back':
-      tabs.goBack()
+      tabStore.goBack()
       break
     case 'forward':
-      tabs.goForward()
+      tabStore.goForward()
       break
     case 'home':
-      tabs.goHome()
+      useSearchViewStore.getState().clear()
+      tabStore.navigate(HOME_URL)
       break
     case 'bookmark':
-      if (active && active.url !== HOME_URL) {
-        useBookmarkStore.getState().toggleBookmark(active.url, active.title)
+      if (activeTab && activeTab.url !== HOME_URL) {
+        useBookmarkStore.getState().toggleBookmark(activeTab.url, activeTab.title)
       }
       break
   }
 }
 
-/**
- * Phim tat den tu hai huong: ban phim go thang vao giao dien React, va su kien
- * do main process chuyen ve khi tieu diem dang nam trong trang web.
- */
 export function useBrowserShortcuts(): void {
   useEffect(() => {
-    const unsubscribe = window.browser.onShortcut(runShortcut)
-
-    const onKeyDown = (e: KeyboardEvent): void => {
-      const key = e.key.toLowerCase()
-      let name: string | null = null
-
-      if (e.ctrlKey && !e.altKey && !e.shiftKey) {
-        if (key === 't') name = 'newTab'
-        else if (key === 'w') name = 'closeTab'
-        else if (key === 'l') name = 'focusOmnibox'
-        else if (key === 'd') name = 'bookmark'
-        else if (key === 'r') name = 'reload'
-      } else if (e.altKey && !e.ctrlKey) {
-        if (key === 'd') name = 'focusOmnibox'
-        else if (key === 'arrowleft') name = 'back'
-        else if (key === 'arrowright') name = 'forward'
-        else if (key === 'home') name = 'home'
-      } else if (key === 'f5') {
-        name = 'reload'
+    function onKeyDown(event: KeyboardEvent): void {
+      const name = shortcutFromEvent(event)
+      if (name) {
+        event.preventDefault()
+        runShortcut(name)
       }
-
-      if (!name) return
-      e.preventDefault()
-      runShortcut(name)
     }
 
     window.addEventListener('keydown', onKeyDown)
+    const unsubscribe = window.browser.onShortcut((name) => runShortcut(name as ShortcutName))
+
     return () => {
-      unsubscribe()
       window.removeEventListener('keydown', onKeyDown)
+      unsubscribe()
     }
   }, [])
 }

@@ -1,50 +1,67 @@
-import { useEffect, useRef, type JSX, type ReactNode } from 'react'
+import { useEffect, type JSX, type ReactNode } from 'react'
 import { useOverlayStore } from '../store/overlayStore'
 
-interface Props {
+interface PopoverProps {
   open: boolean
   onClose: () => void
   align?: 'left' | 'right'
-  // Cho phep de trong: BrowserMenu chua viet noi dung ben trong Popover.
-  children?: ReactNode
+  width?: number
+  children: ReactNode
+  label?: string
 }
 
-/**
- * Lop noi dung chung cho menu/dropdown. Ngoai viec dong khi bam ra ngoai hay
- * nhan Esc, no con bao cho overlayStore biet dang co lop noi — main process
- * dua vao do de an trang web, neu khong WebContentsView se de len tren.
- */
-function Popover({ open, onClose, align = 'right', children }: Props): JSX.Element | null {
-  const ref = useRef<HTMLDivElement>(null)
-  const openOverlay = useOverlayStore((s) => s.open)
-  const closeOverlay = useOverlayStore((s) => s.close)
+function Popover({
+  open,
+  onClose,
+  align = 'right',
+  width = 260,
+  children,
+  label
+}: PopoverProps): JSX.Element | null {
+  const acquire = useOverlayStore((state) => state.acquire)
+  const release = useOverlayStore((state) => state.release)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      return undefined
+    }
+    acquire()
 
-    openOverlay()
-    const onPointerDown = (e: MouseEvent): void => {
-      if (!ref.current?.contains(e.target as Node)) onClose()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onClose()
+      }
     }
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown)
 
     return () => {
-      closeOverlay()
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown)
+      release()
     }
-  }, [open, onClose, openOverlay, closeOverlay])
+  }, [open, acquire, release, onClose])
 
-  if (!open) return null
+  if (!open) {
+    return null
+  }
 
   return (
-    <div ref={ref} className={`popover popover--${align}`}>
-      
-    </div>
+    <>
+      <div className="fixed inset-0 z-40" onMouseDown={onClose} aria-hidden="true" />
+
+      <div
+        role="dialog"
+        aria-label={label}
+        className={
+          'absolute top-[calc(100%+6px)] z-50 animate-scale-in rounded-xl border border-line ' +
+          'bg-surface p-1.5 shadow-pop ' +
+          (align === 'right' ? 'right-0' : 'left-0')
+        }
+        style={{ width }}
+      >
+        {children}
+      </div>
+    </>
   )
 }
 

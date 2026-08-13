@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type JSX,
@@ -7,11 +8,13 @@ import {
   type SyntheticEvent
 } from 'react'
 import { useTabStore, HOME_URL } from '../store/tabStore'
-import { useBookmarkStore } from '../store/bookmarkStore'
+import { useBookmarkStore, collectBookmarks } from '../store/bookmarkStore'
 import { useSearchViewStore } from '../store/searchViewStore'
 import AutocompleteDropdown from './AutocompleteDropdown'
 import { suggest } from '../lib/searchApi'
-import { CloseIcon, GlobeIcon, LockIcon, StarIcon, VnSearchMark } from './icon'
+import { CloseIcon, GlobeIcon, LockIcon, StarIcon, VnSearchMark } from './icons'
+
+const SUGGEST_DEBOUNCE_MS = 180
 
 function looksLikeUrl(text: string): boolean {
   const trimmed = text.trim()
@@ -22,146 +25,150 @@ function looksLikeUrl(text: string): boolean {
 }
 
 function AddressBar(): JSX.Element {
-  const tabs = useTabStore((s) => s.tabs)
-  const activeTabId = useTabStore((s) => s.activeTabId)
-  const navigate = useTabStore((s) => s.navigate)
-  const query = useSearchViewStore((s) => s.query)
-  const setQuery = useSearchViewStore((s) => s.setQuery)
-  const runSearch = useSearchViewStore((s) => s.runSearch)
-  const isBookmarked = useBookmarkStore((s) => s.isBookmarked)
-  const toggleBookmark = useBookmarkStore((s) => s.toggleBookmark)
+  const tabs = useTabStore((state) => state.tabs)
+  const activeTabId = useTabStore((state) => state.activeTabId)
+  const navigate = useTabStore((state) => state.navigate)
+  const query = useSearchViewStore((state) => state.query)
+  const runSearch = useSearchViewStore((state) => state.runSearch)
+  const clearSearch = useSearchViewStore((state) => state.clear)
+  const bookmarkRoot = useBookmarkStore((state) => state.root)
+  const toggleBookmark = useBookmarkStore((state) => state.toggleBookmark)
 
-  useBookmarkStore((s) => s.root)
+  const activeTab = tabs.find((tab) => tab.id === activeTabId)
+  const displayedUrl = !activeTab || activeTab.url === HOME_URL ? '' : activeTab.url
 
-  const activeTab = tabs.find((t) => t.id === activeTabId)
-  const displayedUrl = activeTab?.url === HOME_URL ? '' : (activeTab?.url ?? '')
-  const [inputValue, setInputValue] = useState(query || displayedUrl)
+  const canonicalText = query ?? displayedUrl
+  const [typedValue, setTypedValue] = useState('')
   const [focused, setFocused] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [highlighted, setHighlighted] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<number | undefined>(undefined)
+
+  const inputValue = focused ? typedValue : canonicalText
+  const suggestible = focused && typedValue.trim().length >= 2 && !looksLikeUrl(typedValue)
 
   useEffect(() => {
-    if (focused) return
-    setInputValue(query || displayedUrl)
-  }, [query, displayedUrl, focused])
-
-  useEffect(() => {
-    if (!focused || inputValue.trim().length < 2 || looksLikeUrl(inputValue)) {
-      setSuggestions([])
-      return
+    if (!suggestible) {
+      return undefined
     }
-    window.clearTimeout(debounceRef.current)
-    debounceRef.current = window.setTimeout(() => {
-      suggest(inputValue).then(setSuggestions)
-    }, 180)
 
-    return () => window.clearTimeout(debounceRef.current)
-  }, [inputValue, focused])
+    const timer = window.setTimeout(() => {
+      suggest(typedValue).then(setSuggestions)
+    }, SUGGEST_DEBOUNCE_MS)
 
-  const bookmarked = activeTab && activeTab.url !== HOME_URL ? isBookmarked(activeTab.url) : false
+    return () => window.clearTimeout(timer)
+  }, [typedValue, suggestible])
+
+  const bookmarked = useMemo(() => {
+    if (!displayedUrl) {
+      return false
+    }
+    return collectBookmarks(bookmarkRoot).some((bookmark) => bookmark.url === displayedUrl)
+  }, [bookmarkRoot, displayedUrl])
+
   const isSecure = /^https:\/\//i.test(displayedUrl)
   const searchMode = !displayedUrl || !!query
 
-  function run(text: string): void {
+  function submitValue(text: string): void {
     const value = text.trim()
-    if (!value) return
+    if (!value) {
+      return
+    }
 
     setSuggestions([])
     setHighlighted(-1)
 
     if (looksLikeUrl(value)) {
-      useSearchViewStore.getState().clear()
+      clearSearch()
       navigate(/^https?:\/\//i.test(value) ? value : `https://${value}`)
     } else {
       navigate(HOME_URL)
       runSearch(value)
     }
-    ;(document.activeElement as HTMLElement | null)?.blur()
+    inputRef.current?.blur()
   }
 
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>): void {
-    if (e.key === 'ArrowDown' && suggestions.length > 0) {
-      e.preventDefault()
-      setHighlighted((h) => (h + 1) % suggestions.length)
-    } else if (e.key === 'ArrowUp' && suggestions.length > 0) {
-      e.preventDefault()
-      setHighlighted((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
-    } else if (e.key === 'Escape') {
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (event.key === 'ArrowDown' && suggestions.length > 0) {
+      event.preventDefault()
+      setHighlighted((index) => (index + 1) % suggestions.length)
+    } else if (event.key === 'ArrowUp' && suggestions.length > 0) {
+      event.preventDefault()
+      setHighlighted((index) => (index <= 0 ? suggestions.length - 1 : index - 1))
+    } else if (event.key === 'Escape') {
       setSuggestions([])
       setHighlighted(-1)
-      setInputValue(query || displayedUrl)
+      setTypedValue(canonicalText)
     }
   }
 
-  function handleSubmit(e: SyntheticEvent): void {
-    e.preventDefault()
-    run(highlighted >= 0 ? suggestions[highlighted] : inputValue)
+  function handleSubmit(event: SyntheticEvent): void {
+    event.preventDefault()
+    submitValue(highlighted >= 0 ? suggestions[highlighted] : inputValue)
   }
 
   return (
     <form onSubmit={handleSubmit} className="relative flex min-w-0 flex-1 items-center gap-1.5">
       <div
         className={
-          'flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border px-3.5 transition-all duration-200 ' +
+          'flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border px-3.5 ' +
+          'transition-all duration-200 ' +
           (focused
             ? 'border-brand/45 bg-omni shadow-omni ring-4 ring-brand/10'
             : 'border-transparent bg-omni hover:brightness-110')
         }
       >
         <span className="flex shrink-0 items-center">
-            {searchMode ? (
-              <VnSearchMark className="h-[18px] w-[18px] text-muted" />
-            ) : isSecure ? (
-              <LockIcon className ="h-[15px] w-[15px] text-success" />
-            ) : (
-              <GlobeIcon className="h-[16px] w-[16px] text-warn" />
-            )} 
+          {searchMode ? (
+            <VnSearchMark className="h-[18px] w-[18px] text-muted" />
+          ) : isSecure ? (
+            <LockIcon className="h-[15px] w-[15px] text-success" />
+          ) : (
+            <GlobeIcon className="h-[16px] w-[16px] text-warn" />
+          )}
         </span>
 
-
         <input
-            id="omnibox"
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value)
-              setHighlighted(-1)
-            }}
-            onKeyDown={handleKeyDown}
-            onFocus={(e) => {
-              setFocused(true)
-              e.target.select()
-            }}
-            onBlur={() => {
-              setFocused(false)
-              setHighlighted(-1)
-            }}
-            className ="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none"
-            placeholder="Tìm kiếm hoặc nhập địa chỉ web"
-            spellCheck={false}
-            aria-label="Ô địa chỉ và tìm kiếm"
+          id="omnibox"
+          ref={inputRef}
+          value={inputValue}
+          onChange={(event) => {
+            setTypedValue(event.target.value)
+            setHighlighted(-1)
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={(event) => {
+            setTypedValue(canonicalText)
+            setFocused(true)
+            event.target.select()
+          }}
+          onBlur={() => {
+            setFocused(false)
+            setHighlighted(-1)
+          }}
+          className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none"
+          placeholder="Tìm kiếm hoặc nhập địa chỉ web"
+          spellCheck={false}
+          aria-label="Ô địa chỉ và tìm kiếm"
         />
 
         {inputValue && (
           <button
             type="button"
             onClick={() => {
-              setInputValue('')
+              setTypedValue('')
               setSuggestions([])
               inputRef.current?.focus()
             }}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-faint transition hover:bg-line hover:text-ink"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-faint
+                       transition hover:bg-line hover:text-ink"
             aria-label="Xoá nội dung"
             title="Xoá"
-          > 
+          >
             <CloseIcon className="h-3 w-3" strokeWidth={2.2} />
           </button>
         )}
-
       </div>
-
 
       <button
         type="button"
@@ -170,24 +177,25 @@ function AddressBar(): JSX.Element {
             toggleBookmark(activeTab.url, activeTab.title)
           }
         }}
-        disabled={!activeTab || activeTab.url === HOME_URL}
+        disabled={!displayedUrl}
         className={'icon-btn ' + (bookmarked ? 'text-amber-500 hover:text-amber-500' : '')}
         aria-label="Đánh dấu trang"
         title={bookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu trang (Ctrl+D)'}
       >
-          <StarIcon className="h-[18px] w-[18px]" filled={bookmarked} />
+        <StarIcon className="h-[18px] w-[18px]" filled={bookmarked} />
       </button>
 
       <AutocompleteDropdown
-        items={suggestions}
-        highlighted={highlighted}
-        onPick={(s) => {
-          setInputValue(s)
-          run(s)
+        suggestions={suggestible ? suggestions : []}
+        highlightedIndex={highlighted}
+        query={typedValue}
+        onSelect={(suggestion) => {
+          setTypedValue(suggestion)
+          submitValue(suggestion)
         }}
-        onHover={setHighlighted}
+        onHighlight={setHighlighted}
       />
-    </form> 
+    </form>
   )
 }
 

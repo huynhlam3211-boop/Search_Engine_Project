@@ -1,0 +1,206 @@
+@import 'tailwindcss' source(none);
+@source '..';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-chrome: rgb(223 227 235);
+  --color-surface: rgb(255 255 255);
+  --color-raised: rgb(241 243 248);
+  --color-line: rgb(219 224 233);
+  --color-ink: rgb(24 26 31);
+  --color-muted: rgb(92 100 114);
+  --color-faint: rgb(140 148 162);
+  --color-brand: rgb(79 70 229);
+  --color-brand-soft: rgb(238 240 255);
+  --color-link: rgb(26 90 219);
+  --color-visited: rgb(105 60 190);
+  --color-success: rgb(16 122 87);
+  --color-warn: rgb(180 83 9);
+  --color-danger: rgb(200 45 55);
+  --color-omni: rgb(241 243 248);
+  --color-bookmarks: rgb(232 236 243);
+
+  /*
+   * Bảng màu BIỂU ĐỒ — tách riêng khỏi màu giao diện, có chủ ý.
+   *
+   * Màu giao diện chọn theo thẩm mỹ; màu biểu đồ phải chọn theo thứ ĐO ĐƯỢC:
+   * hai đường kề nhau còn phân biệt được không khi người xem bị mù màu. Bốn ô
+   * dưới là bốn ô đầu của một bảng đã qua kiểm định (kiểm tra tách biệt CVD,
+   * dải độ sáng, sàn sắc độ) trên đúng hai nền mà ứng dụng này dùng:
+   * nền sáng #ffffff và nền tối #1b1e24.
+   *
+   *   ô 1 xanh dương   ô 2 cam   ô 3 xanh ngọc   ô 4 vàng
+   *
+   * Thứ tự ô là CƠ CHẾ AN TOÀN, không phải trang trí: nó được chọn sao cho các
+   * cặp ĐỨNG CẠNH NHAU cách nhau đủ xa. Vì vậy luôn gán màu theo thứ tự ô, và
+   * không bao giờ "quay vòng" sang ô thứ 5 tự chế — chuỗi thứ 5 phải gộp vào
+   * mục "khác".
+   *
+   * Ở nền sáng, ô 3 và ô 4 có độ tương phản dưới 3:1 so với nền. Đó là lý do
+   * mọi biểu đồ dùng chúng đều PHẢI kèm chú giải nhìn thấy được hoặc bảng số —
+   * không để màu là kênh thông tin duy nhất.
+   */
+  --color-viz-1: rgb(42 120 214);
+  --color-viz-2: rgb(235 104 52);
+  --color-viz-3: rgb(27 175 122);
+  --color-viz-4: rgb(237 161 0);
+
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  --shadow-tab: 0 1px 3px rgb(0 0 0 / 0.12);
+  --shadow-omni: 0 1px 6px rgb(0 0 0 / 0.1);
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.18), 0 2px 8px rgb(0 0 0 / 0.08);
+  --shadow-card: 0 8px 24px rgb(0 0 0 / 0.12);
+
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.28s ease-out both;
+  --animate-scale-in: scale-in 0.14s ease-out;
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+.dark {
+  --color-chrome: rgb(17 19 24);
+  --color-surface: rgb(27 30 36);
+  --color-raised: rgb(39 43 51);
+  --color-line: rgb(51 56 65);
+  --color-ink: rgb(232 234 238);
+  --color-muted: rgb(158 165 176);
+  --color-faint: rgb(122 130 142);
+  --color-brand: rgb(129 140 248);
+  --color-brand-soft: rgb(44 46 78);
+  --color-link: rgb(138 180 248);
+  --color-visited: rgb(197 163 245);
+  --color-success: rgb(74 202 152);
+  --color-warn: rgb(240 180 80);
+  --color-danger: rgb(255 130 130);
+  --color-omni: rgb(42 46 55);
+  --color-bookmarks: rgb(20 22 27);
+
+  /*
+   * Cùng bốn sắc màu, nhưng ĐƯỢC CHỌN LẠI BƯỚC cho nền tối — không phải lật
+   * ngược tự động. Một màu đạt chuẩn trên nền trắng gần như luôn quá chói hoặc
+   * quá tối trên nền #1b1e24, nên bốn giá trị này được kiểm định lại như một
+   * bộ riêng, trên đúng nền tối đó.
+   */
+  --color-viz-1: rgb(57 135 229);
+  --color-viz-2: rgb(217 89 38);
+  --color-viz-3: rgb(25 158 112);
+  --color-viz-4: rgb(201 133 0);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-chrome font-sans text-ink antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  .selectable {
+    user-select: text;
+  }
+
+  ::selection {
+    @apply bg-brand/25;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .icon-btn {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted
+           transition-colors duration-150 hover:bg-raised hover:text-ink
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60
+           disabled:pointer-events-none disabled:text-faint/50;
+  }
+
+  .menu-row {
+    @apply flex w-full items-center gap-3 rounded-lg px-2.5 py-[7px] text-left text-[13px]
+           text-ink transition-colors duration-100 hover:bg-raised
+           focus-visible:bg-raised focus-visible:outline-none
+           disabled:pointer-events-none disabled:text-faint/60;
+  }
+
+  .menu-sep {
+    @apply my-1 h-px bg-line;
+  }
+
+  .rail-btn {
+    @apply flex h-9 w-9 items-center justify-center rounded-xl text-muted
+           transition-colors duration-150 hover:bg-raised hover:text-ink
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded bg-raised;
+  }
+
+  .skeleton::after {
+    @apply absolute inset-0 animate-shimmer bg-linear-to-r from-transparent via-white/50
+           to-transparent content-[''];
+    transform: translateX(-100%);
+  }
+
+  .dark .skeleton::after {
+    @apply via-white/[0.07];
+  }
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-faint) 40%, transparent);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-faint) 70%, transparent);
+}

@@ -6,51 +6,69 @@ import SideRail from './components/SideRail'
 import SidePanel from './components/SidePanel'
 import NewTabPage from './components/NewTabPage'
 import SearchResultList from './components/SearchResultList'
+import AdminPanel from './components/admin/AdminPanel'
+import AuthScreen from './components/auth/AuthScreen'
+import { track } from './lib/telemetry'
 import { useTabStore, HOME_URL } from './store/tabStore'
 import { useSearchViewStore } from './store/searchViewStore'
 import { useOverlayStore } from './store/overlayStore'
 import { useSidePanelStore, PANEL_WIDTH } from './store/sidePanelStore'
+import { useSessionStore } from './store/sessionStore'
 import { useBrowserShortcuts } from './lib/useBrowserShortcuts'
 
 function App(): JSX.Element {
-  const init = useTabStore((s) => s.init)
-  const showInternalContent = useTabStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeTabId)
-    return !tab || tab.url === HOME_URL
-  })
-
-  const hasQuery = useSearchViewStore((s) => s.query.length > 0)
-  const hasOverlay = useOverlayStore((s) => s.count > 0)
-  const panelWidth = useSidePanelStore((s) => (s.open ? PANEL_WIDTH : 0))
+  const init = useTabStore((state) => state.init)
+  const tabs = useTabStore((state) => state.tabs)
+  const activeTabId = useTabStore((state) => state.activeTabId)
+  const query = useSearchViewStore((state) => state.query)
+  const overlayCount = useOverlayStore((state) => state.count)
+  const panelOpen = useSidePanelStore((state) => state.open)
+  const restoreSession = useSessionStore((state) => state.restore)
 
   useBrowserShortcuts()
 
   useEffect(() => {
     init()
-  }, [init])
+    // Khôi phục phiên đăng nhập TRƯỚC khi gửi sự kiện, để sự kiện đầu tiên
+    // cũng mang được danh tính. Máy chủ là nguồn sự thật: `restore` hỏi
+    // /api/auth/me chứ không tin token trong localStorage.
+    void restoreSession().then(() => {
+      // Một phiên bắt đầu. Gửi ngay ở đây chứ không đợi lượt tìm kiếm đầu
+      // tiên: người mở ứng dụng rồi chỉ duyệt web vẫn là một người truy cập,
+      // và không đếm họ sẽ làm mọi tỉ lệ "lượt tìm trên mỗi người" bị thổi phồng.
+      track({ type: 'visit' })
+    })
+  }, [init, restoreSession])
 
-  // Main process can biet ben phai con bao nhieu cho de dat lai WebContentsView.
   useEffect(() => {
-    window.browser.setPanelWidth(panelWidth)
-  }, [panelWidth])
+    window.browser.setPanelWidth(panelOpen ? PANEL_WIDTH : 0)
+  }, [panelOpen])
 
   useEffect(() => {
-    window.browser.setOverlay(hasOverlay)
-  }, [hasOverlay])
+    window.browser.setOverlay(overlayCount > 0)
+  }, [overlayCount])
+
+  const activeTab = tabs.find((tab) => tab.id === activeTabId)
+  const showInternalContent = !activeTab || activeTab.url === HOME_URL
 
   return (
-    <div className="app">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-chrome text-ink">
       <TabBar />
       <Toolbar />
       <BookmarksBar />
 
-      <div className="app__body">
-        <main className="app__content">
-          {showInternalContent && (hasQuery ? <SearchResultList /> : <NewTabPage />)}
+      <div className="flex min-h-0 flex-1">
+        <main className="min-w-0 flex-1 bg-surface">
+          {showInternalContent && (query ? <SearchResultList key={query} /> : <NewTabPage />)}
         </main>
         <SidePanel />
         <SideRail />
       </div>
+
+      {/* Hai lớp phủ toàn màn hình, tự ẩn khi chưa mở. Đặt CUỐI cây để chúng
+          nằm trên mọi thứ mà không cần đẩy z-index của các phần khác lên. */}
+      <AuthScreen />
+      <AdminPanel />
     </div>
   )
 }

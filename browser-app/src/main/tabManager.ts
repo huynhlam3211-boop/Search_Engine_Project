@@ -1,12 +1,29 @@
 import { BrowserWindow, WebContentsView, type Input, type WebContents } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { HOME_URL, clampZoomFactor, resolveNavigable } from './urlPolicy'
 
 const CHROME_HEIGHT = 122
-
 const SIDE_RAIL_WIDTH = 48
 
-export const HOME_URL = 'vnsearch://home'
+export { HOME_URL }
+
+export interface TabState {
+  id: string
+  url: string
+  title: string
+  loading: boolean
+}
+
+export interface TabsSnapshot {
+  tabs: TabState[]
+  activeTabId: string | null
+}
+
+interface TabEntry {
+  state: TabState
+  view: WebContentsView | null
+}
 
 function shortcutName(input: Input): string | null {
   const key = input.key.toLowerCase()
@@ -30,20 +47,6 @@ function shortcutName(input: Input): string | null {
   return null
 }
 
-export interface TabState {
-  id: string
-  url: string
-  title: string
-  loading: boolean
-  canGoBack: boolean
-  canGoForward: boolean
-}
-
-interface TabEntry {
-  state: TabState
-  view: WebContentsView | null
-}
-
 export class TabManager {
   private readonly window: BrowserWindow
   private readonly chromeView: WebContentsView
@@ -61,14 +64,42 @@ export class TabManager {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false
+        // BẬT sandbox. Trước đây là `false`, và đó là mặc định nguy hiểm nhất
+        // trong tệp này: khung nhìn NÀY là khung duy nhất có preload, tức là
+        // khung duy nhất chạm được tới IPC. Tắt sandbox nghĩa là nếu có một lỗ
+        // hổng XSS trong giao diện, mã của kẻ tấn công chạy trong một tiến
+        // trình có toàn quyền Node — đọc được tệp, mở được tiến trình con.
+        //
+        // Không có gì phải đánh đổi: preload ở đây chỉ dùng `ipcRenderer` và
+        // `contextBridge`, cả hai đều có sẵn trong preload đã sandbox. Đã kiểm
+        // tra cả `@electron-toolkit/preload` — nó chỉ đụng tới `electron` và
+        // `process.platform`/`versions`/`env`, đều được phép.
+        sandbox: true
       }
+    })
+
+    // Vỏ giao diện KHÔNG được rời khỏi trang của chính nó.
+    //
+    // Đây là khung có preload. Nếu một liên kết trong giao diện (hoặc một lỗi
+    // lập trình) khiến nó điều hướng sang một trang ngoài, thì trang ngoài đó
+    // thừa hưởng luôn cầu nối IPC. Nội dung web phải sống trong các tab, và
+    // các tab thì không có preload.
+    this.chromeView.webContents.on('will-navigate', (event, url) => {
+      const current = this.chromeView.webContents.getURL()
+      if (url !== current) {
+        event.preventDefault()
+        this.createTab(url)
+      }
+    })
+    // `target="_blank"` trong vỏ giao diện cũng vậy: mở thành tab, không mở
+    // thành một cửa sổ mới nằm ngoài mọi ràng buộc ở trên.
+    this.chromeView.webContents.setWindowOpenHandler(({ url }) => {
+      this.createTab(url)
+      return { action: 'deny' }
     })
     this.window.contentView.addChildView(this.chromeView)
     this.layoutChrome()
 
-    // Giao dien React nam trong chromeView chu khong phai trong BrowserWindow:
-    // BrowserWindow o day chi con la cai khung rong chua cac WebContentsView.
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       this.chromeView.webContents.loadURL(process.env['ELECTRON_RENDERER_URL'])
     } else {
@@ -80,13 +111,135 @@ export class TabManager {
     this.createTab(HOME_URL)
   }
 
-  /** Cho main/index.ts doi giao dien nap xong roi moi hien cua so (tranh nhay trang trang). */
+  get chromeContents(): WebContents {
+    return this.chromeView.webContents
+  }
+
   onChromeReady(callback: () => void): void {
     this.chromeView.webContents.once('did-finish-load', callback)
   }
 
-  get chromeContents(): WebContents {
-    return this.chromeView.webContents
+  snapshot(): TabsSnapshot {
+    return {
+      tabs: this.order.map((id) => this.tabs.get(id)!.state),
+      activeTabId: this.activeTabId
+    }
+  }
+
+  createTab(url: string = HOME_URL): string {
+    const id = `tab-${this.nextTabId++}`
+    this.tabs.set(id, {
+      state: { id, url: HOME_URL, title: 'Tab mới', loading: false },
+      view: null
+    })
+    this.order.push(id)
+    this.activeTabId = id
+
+    if (url !== HOME_URL) {
+      this.navigate(id, url)
+    } else {
+      this.layoutAll()
+      this.emit()
+    }
+    return id
+  }
+
+  closeTab(id: string): void {
+    const entry = this.tabs.get(id)
+    if (!entry) {
+      return
+    }
+
+    this.destroyView(entry)
+    this.tabs.delete(id)
+    const index = this.order.indexOf(id)
+    this.order = this.order.filter((tabId) => tabId !== id)
+
+    if (this.order.length === 0) {
+      this.activeTabId = null
+      this.createTab(HOME_URL)
+      return
+    }
+
+    if (this.activeTabId === id) {
+      this.activeTabId = this.order[Math.min(index, this.order.length - 1)]
+    }
+    this.layoutAll()
+    this.emit()
+  }
+
+  switchTab(id: string): void {
+    if (!this.tabs.has(id)) {
+      return
+    }
+    this.activeTabId = id
+    this.layoutAll()
+    this.emit()
+  }
+
+  navigate(id: string, url: string): void {
+    const entry = this.tabs.get(id)
+    if (!entry) {
+      return
+    }
+
+    if (url === HOME_URL) {
+      this.destroyView(entry)
+      entry.state = { ...entry.state, url: HOME_URL, title: 'Tab mới', loading: false }
+      this.layoutAll()
+      this.emit()
+      return
+    }
+
+    // Danh sách CHO PHÉP http/https — xem `urlPolicy.ts` về lỗ hổng `file://`
+    // mà phép kiểm tra này vá. URL đến đây từ BA nguồn và không nguồn nào đáng
+    // tin: thanh địa chỉ, `window.open` của trang đang mở, và liên kết bị chặn
+    // ở vỏ giao diện.
+    const target = resolveNavigable(url)
+    if (target === null) {
+      entry.state = { ...entry.state, loading: false, title: 'Địa chỉ không được phép mở' }
+      this.emit()
+      return
+    }
+    if (target === HOME_URL) {
+      this.navigate(id, HOME_URL)
+      return
+    }
+
+    const view = entry.view ?? this.createView(entry)
+    entry.state = { ...entry.state, url: target, loading: true }
+    this.layoutAll()
+    this.emit()
+
+    view.webContents.loadURL(target).catch(() => {
+      entry.state = { ...entry.state, loading: false, title: 'Không mở được trang' }
+      this.emit()
+    })
+  }
+
+  reload(id: string): void {
+    this.tabs.get(id)?.view?.webContents.reload()
+  }
+
+  print(id: string): void {
+    this.tabs.get(id)?.view?.webContents.print({}, () => undefined)
+  }
+
+  setZoom(id: string, factor: number): void {
+    // Ép về dải hợp lệ: giá trị này đến từ renderer qua IPC nên có thể là NaN,
+    // 0 hay số âm — và `setZoomFactor(0)` làm nội dung biến mất hẳn, không có
+    // cách nào phục hồi bằng giao diện.
+    this.tabs.get(id)?.view?.webContents.setZoomFactor(clampZoomFactor(factor))
+  }
+
+  setPanelWidth(px: number): void {
+    this.panelWidth = Math.max(0, Math.round(px))
+    this.layoutAll()
+  }
+
+  setOverlay(active: boolean): void {
+    this.overlay = active
+    this.layoutAll()
   }
 
   private layoutChrome(): void {
@@ -104,129 +257,18 @@ export class TabManager {
     })
   }
 
-  setPanelWidth(px: number): void {
-    this.panelWidth = Math.max(0, Math.round(px))
-    this.layoutAll()
-  }
-
-  /**
-   * TAM THOI: tab view luon nam DE len tren chromeView, nen menu/dropdown do
-   * React ve se bi trang web che mat. Cach re nhat: an tab view khi co overlay.
-   */
-  setOverlay(active: boolean): void {
-    this.overlay = active
-    this.layoutAll()
-  }
-
-  setZoom(id: string, factor: number): void {
-    const entry = this.tabs.get(id)
-    entry?.view?.webContents.setZoomFactor(factor)
-  }
-
   private layoutAll(): void {
     this.layoutChrome()
     for (const [id, entry] of this.tabs) {
-      if (!entry.view) continue
+      if (!entry.view) {
+        continue
+      }
       const visible = id === this.activeTabId && !this.overlay
       entry.view.setVisible(visible)
-      if (visible) this.layoutTabView(entry.view)
+      if (visible) {
+        this.layoutTabView(entry.view)
+      }
     }
-  }
-
-  listTabs(): TabState[] {
-    return this.order.map((id) => this.tabs.get(id)!.state)
-  }
-
-  getActiveTabId(): string | null {
-    return this.activeTabId
-  }
-
-  createTab(url: string = HOME_URL): string {
-    const id = `tab-${this.nextTabId++}`
-    this.tabs.set(id, {
-      state: {
-        id,
-        url: HOME_URL,
-        title: 'Tab mới',
-        loading: false,
-        canGoBack: false,
-        canGoForward: false
-      },
-      view: null
-    })
-    this.order.push(id)
-    this.switchTab(id)
-    if (url !== HOME_URL) this.navigate(id, url)
-    this.emit()
-    return id
-  }
-
-  closeTab(id: string): void {
-    const entry = this.tabs.get(id)
-    if (!entry) return
-
-    this.destroyView(entry)
-    this.tabs.delete(id)
-    const index = this.order.indexOf(id)
-    this.order = this.order.filter((t) => t !== id)
-
-    if (this.activeTabId === id) {
-      this.activeTabId = null
-      const next = this.order[Math.min(index, this.order.length - 1)]
-      if (next) this.switchTab(next)
-    }
-    // Dong tab cuoi cung thi mo lai trang chu thay vi de cua so trong.
-    if (this.order.length === 0) this.createTab(HOME_URL)
-    this.emit()
-  }
-
-  switchTab(id: string): void {
-    if (!this.tabs.has(id)) return
-    this.activeTabId = id
-    this.layoutAll()
-    this.emit()
-  }
-
-  navigate(id: string, url: string): void {
-    const entry = this.tabs.get(id)
-    if (!entry) return
-
-    if (url === HOME_URL) {
-      // Trang chu la mot man hinh cua React nen khong can WebContentsView.
-      this.destroyView(entry)
-      entry.state = { ...entry.state, url: HOME_URL, title: 'Tab mới', loading: false }
-      this.layoutAll()
-      this.emit()
-      return
-    }
-
-    const target = /^[a-z]+:\/\//i.test(url) ? url : `https://${url}`
-    const view = entry.view ?? this.createView(entry)
-    entry.state = { ...entry.state, url: target, loading: true }
-    this.layoutAll()
-    view.webContents.loadURL(target).catch(() => {
-      entry.state = { ...entry.state, loading: false, title: 'Không mở được trang' }
-      this.emit()
-    })
-    this.emit()
-  }
-
-  goBack(id: string): void {
-    const nav = this.tabs.get(id)?.view?.webContents.navigationHistory
-    if (nav?.canGoBack()) nav.goBack()
-  }
-
-  goForward(id: string): void {
-    const nav = this.tabs.get(id)?.view?.webContents.navigationHistory
-    if (nav?.canGoForward()) nav.goForward()
-  }
-
-  reload(id: string): void {
-    this.tabs.get(id)?.view?.webContents.reload()
-  }
-
-  print(id: string): void {
-    this.tabs.get(id)?.view?.webContents.print({}, () => undefined)
   }
 
   private createView(entry: TabEntry): WebContentsView {
@@ -242,7 +284,9 @@ export class TabManager {
   }
 
   private destroyView(entry: TabEntry): void {
-    if (!entry.view) return
+    if (!entry.view) {
+      return
+    }
     this.window.contentView.removeChildView(entry.view)
     entry.view.webContents.close()
     entry.view = null
@@ -251,12 +295,7 @@ export class TabManager {
   private bindViewEvents(entry: TabEntry, view: WebContentsView): void {
     const wc = view.webContents
     const sync = (patch: Partial<TabState>): void => {
-      entry.state = {
-        ...entry.state,
-        ...patch,
-        canGoBack: wc.navigationHistory.canGoBack(),
-        canGoForward: wc.navigationHistory.canGoForward()
-      }
+      entry.state = { ...entry.state, ...patch }
       this.emit()
     }
 
@@ -272,22 +311,23 @@ export class TabManager {
   }
 
   private forwardShortcuts(wc: WebContents): void {
-    // Khi tieu diem dang o trong trang web, phim tat cua trinh duyet phai duoc
-    // chuyen nguoc ve giao dien React, neu khong Ctrl+T se roi vao trang web.
     wc.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown') return
+      if (input.type !== 'keyDown') {
+        return
+      }
       const name = shortcutName(input)
-      if (!name) return
+      if (!name) {
+        return
+      }
       event.preventDefault()
       this.chromeView.webContents.send('browser:shortcut', name)
     })
   }
 
   private emit(): void {
-    if (this.chromeView.webContents.isDestroyed()) return
-    this.chromeView.webContents.send('browser:tabs', {
-      tabs: this.listTabs(),
-      activeTabId: this.activeTabId
-    })
+    if (this.chromeView.webContents.isDestroyed()) {
+      return
+    }
+    this.chromeView.webContents.send('browser:tabs', this.snapshot())
   }
 }

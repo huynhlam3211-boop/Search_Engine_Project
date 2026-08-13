@@ -1,11 +1,10 @@
-import { app, BrowserWindow} from 'electron'
-import { electronApp, optimizer} from '@electron-toolkit/utils'
+import { app, BrowserWindow } from 'electron'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { TabManager } from './tabManager'
 import { registerIpcHandlers } from './ipcHandler'
 import { registerWindowControls } from './windowControls'
 
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -19,10 +18,8 @@ function createWindow(): void {
 
   const tabManager = new TabManager(mainWindow)
   registerIpcHandlers(tabManager)
-  registerWindowControls(mainWindow)
+  registerWindowControls(mainWindow, tabManager.chromeContents)
 
-  // BrowserWindow nay khong tu nap trang nao nen se khong bao gio phat
-  // 'ready-to-show'; phai doi chromeView nap xong roi moi hien cua so.
   tabManager.onChromeReady(() => mainWindow.show())
 }
 
@@ -35,10 +32,11 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
   })
-
 })
 
 app.on('window-all-closed', () => {

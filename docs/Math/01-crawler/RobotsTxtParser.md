@@ -19,6 +19,51 @@ Allow: /admin/public
 
 Vấn đề thú vị nằm ở chỗ **nhiều luật có thể cùng khớp một đường dẫn**. Với `/admin/public/x`, cả `Disallow: /admin` lẫn `Allow: /admin/public` đều khớp. **Luật nào thắng?**
 
+```
+   Đường dẫn cần quyết định:  /admin/public/x
+
+   luật 1:  Disallow: /admin           khớp,  dài  6 ký tự
+   luật 2:  Allow:    /admin/public    khớp,  dài 13 ký tự  ◀── DÀI HƠN ⇒ THẮNG
+
+            /admin/public/x
+            ├─────┤                    luật 1 phủ tới đây
+            ├────────────┤             luật 2 phủ tới đây — CỤ THỂ HƠN
+```
+
+**Quy tắc: khớp tiền tố DÀI NHẤT thắng.** Trực giác đằng sau: luật dài hơn là
+luật **cụ thể hơn**, và cái cụ thể bao giờ cũng là ngoại lệ có chủ ý của cái
+tổng quát.
+
+```mermaid
+%%{init:{'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','secondaryTextColor':'#000000','secondaryBorderColor':'#000000','tertiaryColor':'#ffffff','tertiaryTextColor':'#000000','tertiaryBorderColor':'#000000','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','sequenceNumberColor':'#ffffff','fontFamily':'ui-monospace, SFMono-Regular, Consolas, monospace'}}}%%
+flowchart TD
+    P["đường dẫn /admin/public/x"]
+    C["thu mọi luật KHỚP tiền tố"]
+    L1["Disallow /admin · dài 6"]
+    L2["Allow /admin/public · dài 13"]
+    M{"chọn luật DÀI NHẤT"}
+    R["Allow ⇒ được phép tải"]
+
+    P --> C --> L1 & L2 --> M --> R
+```
+
+Máy trạng thái đọc tệp — chỗ dễ sai nhất là **khối `User-agent` nào đang mở**:
+
+```mermaid
+%%{init:{'theme':'base','themeVariables':{'background':'#ffffff','primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','secondaryColor':'#ffffff','secondaryTextColor':'#000000','secondaryBorderColor':'#000000','tertiaryColor':'#ffffff','tertiaryTextColor':'#000000','tertiaryBorderColor':'#000000','lineColor':'#000000','textColor':'#000000','mainBkg':'#ffffff','nodeBorder':'#000000','clusterBkg':'#ffffff','clusterBorder':'#000000','edgeLabelBackground':'#ffffff','actorBkg':'#ffffff','actorBorder':'#000000','actorTextColor':'#000000','actorLineColor':'#000000','signalColor':'#000000','signalTextColor':'#000000','labelBoxBkgColor':'#ffffff','labelBoxBorderColor':'#000000','labelTextColor':'#000000','loopTextColor':'#000000','noteBkgColor':'#ffffff','noteBorderColor':'#000000','noteTextColor':'#000000','sequenceNumberColor':'#ffffff','fontFamily':'ui-monospace, SFMono-Regular, Consolas, monospace'}}}%%
+stateDiagram-v2
+    [*] --> NgoaiKhoi
+    NgoaiKhoi --> TrongKhoiCuaTa : User-agent khớp * hoặc tên ta
+    NgoaiKhoi --> TrongKhoiKhac : User-agent của bot khác
+    TrongKhoiCuaTa --> TrongKhoiCuaTa : Allow / Disallow → GHI NHẬN
+    TrongKhoiKhac --> TrongKhoiKhac : Allow / Disallow → BỎ QUA
+    TrongKhoiCuaTa --> NgoaiKhoi : dòng trống
+    TrongKhoiKhac --> NgoaiKhoi : dòng trống
+```
+
+Bỏ qua trạng thái này là đọc nhầm luật của bot khác thành luật của mình — lỗi
+im lặng, và hậu quả là crawl vào chỗ bị cấm.
+
 Câu trả lời của chuẩn Robots Exclusion Protocol: **luật có đường dẫn dài nhất (cụ thể nhất) thắng**. Đây là nguyên tắc **longest-prefix-match**, cùng họ với cách bộ định tuyến IP chọn tuyến đường.
 
 ---
@@ -37,9 +82,10 @@ IS-PATH-ALLOWED(rules, path):
     trả về (best = null) hoặc best.isAllow      # không luật nào khớp → cho phép
 ```
 
-**Mã thật:**
+**Mã thật — `RobotsTxtParser.java:59-70`:**
 
 ```java
+/** Luat co duong dan CU THE (dai) nhat khop se thang (chuan robots.txt). */
 boolean isPathAllowed(List<Rule> rules, String path) {
     Rule best = null;
     for (Rule rule : rules) {
@@ -52,6 +98,17 @@ boolean isPathAllowed(List<Rule> rules, String path) {
     return best == null || best.isAllow();
 }
 ```
+
+> ⚠️ **Toán tử `>` chặt, không phải `>=` — và đó là một sai lệch nhỏ so với chuẩn.**
+> Khi hai luật khớp **cùng độ dài**, `>` giữ nguyên luật gặp **trước**. Chuẩn
+> quy định `Allow` thắng trong ca hoà. Đổi thành `>=` cũng chưa đúng — nó chỉ
+> lật thành "luật gặp **sau** thắng". Muốn đúng chuẩn phải viết:
+> ```java
+> if (best == null
+>         || rule.path().length() > best.path().length()
+>         || (rule.path().length() == best.path().length() && rule.isAllow())) {
+> ```
+> Ghi lại ở §6.2 như một hạn chế đã biết.
 
 **Chạy tay với ví dụ ở đầu bài:**
 
@@ -106,13 +163,20 @@ private final Map<String, List<Rule>> cache = new ConcurrentHashMap<>();
 List<Rule> rules = cache.computeIfAbsent(domainKey, key -> fetchAndParse(key, userAgent));
 ```
 
-Fetch robots.txt qua mạng mất khoảng **100–500 ms**. Không cache thì với 5.011 trang:
+Fetch robots.txt qua mạng mất khoảng **100–500 ms**. Không cache thì với 5.011 trang *(mốc A)*:
 
 $$5011 \times 200\text{ms} \approx \mathbf{17 \text{ phút}} \text{ chỉ để tải robots.txt}$$
 
 — gấp hơn 5 lần toàn bộ thời gian crawl thật (3,2 phút). Có cache, ta tải đúng **52 lần** (mỗi host một lần):
 
 $$52 \times 200\text{ms} \approx \mathbf{10 \text{ giây}}$$
+
+**Độ lợi tăng theo quy mô, không giảm.** Ở mốc D (31.030 trang, 93 host):
+
+$$\underbrace{31030 \times 200\text{ms} \approx 103 \text{ phút}}_{\text{không cache}} \quad\text{so với}\quad \underbrace{93 \times 200\text{ms} \approx 19 \text{ giây}}_{\text{có cache}}$$
+
+Tỷ lệ tiết kiệm đi từ ~96× lên ~330×, vì số lần tải chỉ tăng theo **số host** còn
+số lần hỏi tăng theo **số trang** — hai đại lượng lệch nhau ngày càng xa.
 
 **Vì sao `ConcurrentHashMap` mà không phải `synchronized Map`:** nhiều worker thread cùng gọi `isAllowed` đồng thời. `computeIfAbsent` của `ConcurrentHashMap` khoá **theo bucket** chứ không khoá cả bảng, nên hai thread hỏi hai domain khác nhau không chặn nhau.
 
@@ -214,7 +278,7 @@ $$394\,940 \times 50 \times 60 \approx 1{,}2 \times 10^9 \text{ phép so ký t�
 
 Nghe lớn, nhưng đó là khoảng **1 giây CPU** — không đáng kể so với 3,2 phút chờ mạng.
 
-> **Nếu $R$ lớn.** Có site có hàng nghìn luật. Khi đó nên dựng một **Trie** trên các đường dẫn luật: longest-prefix-match trở thành "đi sâu nhất có thể trong trie", tức $O(L)$ thay vì $O(R \cdot L)$. Đây đúng là cấu trúc mà bộ định tuyến IP dùng. Dự án đã có sẵn một `Trie` tự cài ([Trie.md](../06-datastructures/Trie.md)) nên chi phí tái sử dụng rất thấp — một hướng mở rộng tự nhiên.
+> **Nếu $R$ lớn.** Có site có hàng nghìn luật. Khi đó nên dựng một **Trie** trên các đường dẫn luật: longest-prefix-match trở thành "đi sâu nhất có thể trong trie", tức $O(L)$ thay vì $O(R \cdot L)$. Đây đúng là cấu trúc mà bộ định tuyến IP dùng. Dự án đã có sẵn một `Trie` tự cài ([Trie.md](../05-datastructures/Trie.md)) nên chi phí tái sử dụng rất thấp — một hướng mở rộng tự nhiên.
 
 ---
 
@@ -245,5 +309,5 @@ Nghe lớn, nhưng đó là khoảng **1 giây CPU** — không đáng kể so v
 ## 7. Liên kết
 
 - Người dùng: [CrawlerService.md](CrawlerService.md)
-- Cấu trúc có thể dùng để tăng tốc `isPathAllowed`: [Trie.md](../06-datastructures/Trie.md)
+- Cấu trúc có thể dùng để tăng tốc `isPathAllowed`: [Trie.md](../05-datastructures/Trie.md)
 - Ký hiệu chưa hiểu: [00 — Từ điển ký hiệu toán](../00-KY-HIEU-TOAN.md)

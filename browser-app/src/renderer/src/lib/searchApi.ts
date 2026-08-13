@@ -1,219 +1,180 @@
-import { SEED_SITES } from './seedSites'
-
+/**
+ * Máy chủ VnSearch. Xuất ra ngoài để `telemetry.ts` và `adminApi.ts` dùng
+ * CHUNG một địa chỉ — ba bản sao của cùng một chuỗi là ba chỗ phải nhớ sửa khi
+ * đổi cổng, và chỗ bị quên sẽ hỏng lặng lẽ.
+ */
 export const API_BASE = 'http://localhost:8080'
+const REQUEST_TIMEOUT_MS = 8000
 
 export interface SearchResultDto {
-  url: string
   title: string
+  url: string
   snippet: string
-  score?: number
+  score: number
+  pageRankScore: number
+  crawledAt: string
 }
 
-export interface SearchResponse {
-  items: SearchResultDto[]
-  total: number
-  tookMs: number
-  /** true = ket qua gia lap vi backend chua tra loi. */
-  mock: boolean
+export interface SearchResponseDto {
+  query: string
+  results: SearchResultDto[]
+  totalResults: number
+  page: number
+  pageSize: number
+  timeTakenMs: number
+  droppedTerms: string[]
 }
 
-/**
- * BAN VA TAM THOI.
- *
- * Backend (search-engine) hien moi co phan crawler, chua co REST controller nao,
- * nen /api/search chac chan 404. Ham nay van goi that truoc — de khi ban them
- * controller thi frontend tu dong dung du lieu that — va chi rot xuong du lieu
- * gia lap khi goi that hong. Co `mock` trong ket qua de giao dien noi ro cho
- * nguoi dung biet dang xem so lieu gia.
- */
-
-let backendDown = false
-let backendCheckedAt = 0
-const RECHECK_MS = 15_000
-
-async function fetchJson<T>(path: string, timeoutMs = 1500): Promise<T> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(`${API_BASE}${path}`, { signal: controller.signal })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return (await res.json()) as T
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-function backendLikelyDown(): boolean {
-  if (!backendDown) return false
-  // Sau RECHECK_MS thi thu lai, phong khi backend vua duoc bat len.
-  if (Date.now() - backendCheckedAt > RECHECK_MS) {
-    backendDown = false
-    return false
-  }
-  return true
-}
-
-function markBackendDown(): void {
-  backendDown = true
-  backendCheckedAt = Date.now()
-}
-
-export async function search(query: string, page = 0): Promise<SearchResponse> {
-  const started = performance.now()
-
-  if (!backendLikelyDown()) {
-    try {
-      const data = await fetchJson<{ items?: SearchResultDto[]; total?: number; tookMs?: number }>(
-        `/api/search?q=${encodeURIComponent(query)}&page=${page}`
-      )
-      return {
-        items: data.items ?? [],
-        total: data.total ?? data.items?.length ?? 0,
-        tookMs: data.tookMs ?? Math.round(performance.now() - started),
-        mock: false
-      }
-    } catch {
-      markBackendDown()
-    }
+export async function getJson<T>(
+  path: string,
+  params: Record<string, string | number>
+): Promise<T> {
+  const url = new URL(path, API_BASE)
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value))
   }
 
-  const items = mockSearch(query)
-  return {
-    items,
-    total: items.length,
-    tookMs: Math.round(performance.now() - started),
-    mock: true
-  }
-}
-
-export async function suggest(prefix: string): Promise<string[]> {
-  const key = prefix.trim().toLowerCase()
-  if (!key) return []
-
-  if (!backendLikelyDown()) {
-    try {
-      const data = await fetchJson<string[] | { suggestions?: string[] }>(
-        `/api/suggest?q=${encodeURIComponent(key)}`,
-        800
-      )
-      return Array.isArray(data) ? data : (data.suggestions ?? [])
-    } catch {
-      markBackendDown()
-    }
-  }
-
-  return mockSuggest(key)
-}
-
-/** Kiem tra backend co song khong — dung cho chi bao trang thai o thanh ben. */
-export async function ping(): Promise<boolean> {
-  try {
-    await fetchJson('/api/admin/stats', 1200)
-    backendDown = false
-    return true
-  } catch {
-    markBackendDown()
-    return false
-  }
-}
-
-// --------------------------------------------------------------------------
-// Du lieu gia lap — xoa toan bo phan duoi khi backend co /api/search that.
-// --------------------------------------------------------------------------
-
-interface MockDoc {
-  url: string
-  title: string
-  body: string
-}
-
-const MOCK_CORPUS: MockDoc[] = [
-  ...SEED_SITES.map((site) => ({
-    url: site.url,
-    title: site.title,
-    body: `${site.title} — ${site.tags.join(', ')}. Trang chủ ${site.url}.`
-  })),
-  {
-    url: 'https://vi.wikipedia.org/wiki/Máy_tìm_kiếm',
-    title: 'Máy tìm kiếm – Wikipedia tiếng Việt',
-    body: 'Máy tìm kiếm là hệ thống thu thập trang web bằng trình thu thập (crawler), lập chỉ mục ngược và xếp hạng kết quả theo độ liên quan.'
-  },
-  {
-    url: 'https://vi.wikipedia.org/wiki/Bộ_lọc_Bloom',
-    title: 'Bộ lọc Bloom – Wikipedia tiếng Việt',
-    body: 'Bộ lọc Bloom là cấu trúc dữ liệu xác suất, tiết kiệm bộ nhớ, dùng để kiểm tra một phần tử đã xuất hiện hay chưa; có thể báo dương tính giả nhưng không âm tính giả.'
-  },
-  {
-    url: 'https://vi.wikipedia.org/wiki/PageRank',
-    title: 'PageRank – thuật toán xếp hạng trang',
-    body: 'PageRank xếp hạng trang web dựa trên cấu trúc liên kết, coi mỗi liên kết là một lá phiếu và tính vector riêng của ma trận chuyển.'
-  },
-  {
-    url: 'https://vnexpress.net/khoa-hoc',
-    title: 'Khoa học - VnExpress',
-    body: 'Tin khoa học công nghệ, nghiên cứu mới, vũ trụ, trí tuệ nhân tạo cập nhật hằng ngày.'
-  },
-  {
-    url: 'https://tuoitre.vn/giao-duc.htm',
-    title: 'Giáo dục - Tuổi Trẻ Online',
-    body: 'Tin tức giáo dục, tuyển sinh đại học, đề thi và điểm chuẩn các trường.'
-  },
-  {
-    url: 'https://github.com/topics/web-crawler',
-    title: 'web-crawler · GitHub Topics',
-    body: 'Các dự án mã nguồn mở về trình thu thập dữ liệu web, hàng đợi URL, chuẩn hoá URL và tuân thủ robots.txt.'
-  },
-  {
-    url: 'https://stackoverflow.com/questions/tagged/lucene',
-    title: 'Câu hỏi gắn thẻ lucene - Stack Overflow',
-    body: 'Hỏi đáp về Apache Lucene, chỉ mục ngược, phân tích văn bản và tính điểm BM25.'
-  }
-]
-
-/** Bo dau tieng Viet de go khong dau van tim duoc. */
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd')
-}
-
-function mockSearch(query: string): SearchResultDto[] {
-  const terms = normalize(query).split(/\s+/).filter(Boolean)
-  if (terms.length === 0) return []
-
-  return MOCK_CORPUS.map((doc) => {
-    const haystack = normalize(`${doc.title} ${doc.body} ${doc.url}`)
-    // Cham diem tho: dem so lan xuat hien, tieu de tinh diem gap doi.
-    let score = 0
-    for (const term of terms) {
-      const inTitle = normalize(doc.title).includes(term)
-      const hits = haystack.split(term).length - 1
-      score += hits + (inTitle ? 2 : 0)
-    }
-    return { doc, score }
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   })
-    .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(({ doc, score }) => ({
-      url: doc.url,
-      title: doc.title,
-      snippet: doc.body,
-      score: Number(score.toFixed(2))
-    }))
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`)
+  }
+  return (await response.json()) as T
 }
 
-function mockSuggest(prefix: string): string[] {
-  const key = normalize(prefix)
-  const pool = [
-    ...MOCK_CORPUS.map((d) => d.title),
-    ...SEED_SITES.flatMap((s) => s.tags),
-    'bộ lọc bloom là gì',
-    'cách hoạt động của máy tìm kiếm',
-    'chỉ mục ngược inverted index',
-    'thuật toán pagerank',
-    'crawler tuân thủ robots.txt'
-  ]
-  return Array.from(new Set(pool.filter((s) => normalize(s).includes(key)))).slice(0, 8)
+function normalizeResult(raw: Partial<SearchResultDto>): SearchResultDto {
+  return {
+    title: raw.title ?? raw.url ?? '',
+    url: raw.url ?? '',
+    snippet: raw.snippet ?? '',
+    score: raw.score ?? 0,
+    pageRankScore: raw.pageRankScore ?? 0,
+    crawledAt: raw.crawledAt ?? ''
+  }
+}
+
+export async function search(query: string, page = 1, pageSize = 10): Promise<SearchResponseDto> {
+  const raw = await getJson<Partial<SearchResponseDto>>('/api/search', {
+    q: query,
+    page,
+    size: pageSize
+  })
+
+  const results = (raw.results ?? []).map(normalizeResult)
+
+  return {
+    query: raw.query ?? query,
+    results,
+    totalResults: raw.totalResults ?? results.length,
+    page: raw.page ?? page,
+    // Máy chủ trả về `pageSize` ĐÃ ÁP DỤNG, có thể khác giá trị vừa gửi lên:
+    // một `size` ngoài khoảng 1..100 bị thay bằng mặc định 20. Vì vậy giá trị
+    // của máy chủ mới là giá trị đúng, và `?? pageSize` chỉ còn là lối lùi cho
+    // máy chủ đời cũ chưa có trường này.
+    pageSize: raw.pageSize ?? pageSize,
+    timeTakenMs: raw.timeTakenMs ?? 0,
+    droppedTerms: raw.droppedTerms ?? []
+  }
+}
+
+export interface ImageResultDto {
+  imageUrl: string
+  pageUrl: string
+  pageTitle: string
+  host: string
+  altText: string
+  /** Chiều rộng KHAI BÁO trong HTML, `-1` khi trang không khai báo. */
+  width: number
+  height: number
+  missingAlt: boolean
+}
+
+export interface ImageResponseDto {
+  query: string
+  results: ImageResultDto[]
+  page: number
+  pageSize: number
+  /** TỔNG số ảnh khớp truy vấn — không phải số ảnh trong lô này. */
+  totalResults: number
+  /**
+   * Còn lô nữa không.
+   *
+   * Do máy chủ tính, KHÔNG suy từ `results.length === pageSize`. Cách suy đó
+   * sai đúng ở ca biên hay gặp nhất: khi tổng số ảnh chia hết cho pageSize,
+   * lô cuối đầy đủ nên giao diện tưởng còn nữa, gọi thêm một lần rồi nhận về
+   * rỗng — người dùng thấy vòng quay chạy vô ích ở cuối trang.
+   */
+  hasMore: boolean
+  /**
+   * Số trang đã xét để lấy ảnh.
+   *
+   * Cần cho giao diện phân biệt HAI ca mà nếu chỉ nhìn `results` rỗng thì
+   * trông giống hệt nhau:
+   *
+   *   pagesScanned === 0  → truy vấn không khớp trang nào
+   *   pagesScanned > 0    → có trang khớp, nhưng chưa trang nào được
+   *                         Image Download Service xử lý
+   *
+   * Ca thứ hai cần một thông báo hoàn toàn khác: "hãy chạy crawl", chứ không
+   * phải "không tìm thấy" — nói sai chỗ này khiến người dùng đi sửa truy vấn
+   * trong khi vấn đề nằm ở chỗ chưa có dữ liệu.
+   */
+  pagesScanned: number
+  timeTakenMs: number
+}
+
+function normalizeImage(raw: Partial<ImageResultDto>): ImageResultDto {
+  return {
+    imageUrl: raw.imageUrl ?? '',
+    pageUrl: raw.pageUrl ?? '',
+    pageTitle: raw.pageTitle || (raw.pageUrl ?? ''),
+    host: raw.host ?? '',
+    altText: raw.altText ?? '',
+    width: raw.width ?? -1,
+    height: raw.height ?? -1,
+    missingAlt: raw.missingAlt ?? false
+  }
+}
+
+export async function searchImages(query: string, page = 1, size = 30): Promise<ImageResponseDto> {
+  const raw = await getJson<Partial<ImageResponseDto>>('/api/images', {
+    q: query,
+    page,
+    size
+  })
+  const results = (raw.results ?? [])
+    .map(normalizeImage)
+    // Bỏ mục không có địa chỉ ảnh: chúng chỉ tạo ra một ô vỡ trong lưới.
+    .filter((image) => image.imageUrl !== '')
+
+  return {
+    query: raw.query ?? query,
+    results,
+    page: raw.page ?? page,
+    pageSize: raw.pageSize ?? size,
+    totalResults: raw.totalResults ?? results.length,
+    hasMore: raw.hasMore ?? false,
+    pagesScanned: raw.pagesScanned ?? 0,
+    timeTakenMs: raw.timeTakenMs ?? 0
+  }
+}
+
+export async function suggest(query: string, limit = 8): Promise<string[]> {
+  const trimmed = query.trim()
+  if (!trimmed) {
+    return []
+  }
+
+  try {
+    const raw = await getJson<unknown>('/api/suggest', { q: trimmed, limit })
+    const list = Array.isArray(raw) ? raw : ((raw as { suggestions?: unknown })?.suggestions ?? [])
+    return Array.isArray(list)
+      ? list.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
 }

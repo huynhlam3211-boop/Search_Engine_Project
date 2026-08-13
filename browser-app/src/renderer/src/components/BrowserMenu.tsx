@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
+import { useShallow } from 'zustand/shallow'
 import Popover from './Popover'
 import { useTabStore, HOME_URL } from '../store/tabStore'
 import { useHistoryStore } from '../store/historyStore'
 import { useSidePanelStore } from '../store/sidePanelStore'
-import { useZoomStore } from '../store/zoomStore'
-import { ACCOUNT } from '../lib/account'
+import { useZoomStore, zoomFactorOf } from '../store/zoomStore'
+import { useSessionStore } from '../store/sessionStore'
 import { hostOf, siteGradient, siteInitial } from '../lib/site'
 import {
   ChevronRightIcon,
   ClockIcon,
   DeviceIcon,
-  DowloadIcon,
+  DownloadIcon,
   ExitIcon,
-  FullScreenIcon,
+  FullscreenIcon,
   HelpIcon,
   IncognitoIcon,
   MinusIcon,
@@ -25,16 +26,15 @@ import {
   TranslateIcon,
   TrashIcon,
   VnSearchMark,
-  WindowIcon 
+  WindowIcon
 } from './icons'
-
 
 interface BrowserMenuProps {
   open: boolean
   onClose: () => void
 }
 
-function BrowserMenu({ open, onClose }: Props): JSX.Element {
+function BrowserMenu({ open, onClose }: BrowserMenuProps): JSX.Element {
   const newTab = useTabStore((s) => s.newTab)
   const activeTabId = useTabStore((s) => s.activeTabId)
   const tabs = useTabStore((s) => s.tabs)
@@ -51,61 +51,68 @@ function BrowserMenu({ open, onClose }: Props): JSX.Element {
 
   return (
     <Popover open={open} onClose={onClose} width={304} label="Menu trình duyệt">
-      <AccountRow/>
+      <AccountRow />
 
-      <div className="menu-sep"/>
+      <div className="menu-sep" />
 
-      <MenuItem icon={<VnSearchMark className="h-4 w-4"/>} label="Thẻ mới" shortcut="Ctrl+T" onClick={() => run(() => newTab())} />
       <MenuItem
-        icon={<WindowIcon className="h-[17px] w-[17px" />}
+        icon={<VnSearchMark className="h-4 w-4" />}
+        label="Thẻ mới"
+        shortcut="Ctrl+T"
+        onClick={() => run(() => newTab())}
+      />
+      <MenuItem
+        icon={<WindowIcon className="h-[17px] w-[17px]" />}
         label="Cửa sổ mới"
         shortcut="Ctrl+N"
         disabled
-        title="Ứng dụng hiện tại chỉ chạy một cửa sổ duy nhất."
+        title="Ứng dụng hiện chỉ chạy một cửa sổ duy nhất."
       />
-
       <MenuItem
-        icon={<IncognitoIcon className="h-[17px] w-[17px]"/>}
+        icon={<IncognitoIcon className="h-[17px] w-[17px]" />}
         label="Cửa sổ ẩn danh mới"
-        shorcut="Ctrl+Shift+N"
+        shortcut="Ctrl+Shift+N"
         disabled
         title="Chưa có phiên duyệt riêng tư tách biệt."
       />
-      <div className="menu-sep"/>
-      
-      <HistoryItem onClose={onClose}/>
+
+      <div className="menu-sep" />
+
+      <HistoryItem onClose={onClose} />
       <MenuItem
-        icon={<IncognitoIcon className="h-[17px] w-[17px]"/>}
+        icon={<DownloadIcon className="h-[17px] w-[17px]" />}
         label="Tải xuống"
-        shorcut="Ctrl+J"
+        shortcut="Ctrl+J"
         onClick={() => run(() => openPanel('downloads'))}
       />
       <MenuItem
-        icon={<StarIcon className="h-[17px] w-[17px]"/>}
+        icon={<StarIcon className="h-[17px] w-[17px]" />}
         label="Dấu trang"
         onClick={() => run(() => openPanel('bookmarks'))}
       />
 
+      <div className="menu-sep" />
 
-      <div className="menu-sep"/>
       <MenuItem
-        icon={<PuzzleIcon className="h-[17px] w-[17px]"/>}
+        icon={<PuzzleIcon className="h-[17px] w-[17px]" />}
         label="Tiện ích mở rộng"
         disabled
         title="Chưa nạp tiện ích Chrome."
       />
       <MenuItem
-        icon={<TrashIcon className="h-[17px] w-[17px]"/>}
-        label="Xóa dữ liệu duyệt web"
-        shorcut="Ctrl+Shift+Del"
+        icon={<TrashIcon className="h-[17px] w-[17px]" />}
+        label="Xoá dữ liệu duyệt web"
+        shortcut="Ctrl+Shift+Del"
         onClick={() => run(clearAll)}
-        title="Dọn hai chồng back/forward của mọi thẻ"
+        title="Dọn hai chồng back/forward của mọi thẻ."
       />
-      <div class="menu-sep"/>
 
-      <ZoomRow onClose={onClose} enabled={onExternalPage}/>
-      <div className="menu-sep"/>
-      
+      <div className="menu-sep" />
+
+      <ZoomRow onClose={onClose} enabled={onExternalPage} />
+
+      <div className="menu-sep" />
+
       <MenuItem
         icon={<PrintIcon className="h-[17px] w-[17px]" />}
         label="In…"
@@ -154,49 +161,122 @@ function BrowserMenu({ open, onClose }: Props): JSX.Element {
 interface MenuItemProps {
   icon: JSX.Element
   label: string
-  shortcut>: string
+  shortcut?: string
   onClick?: () => void
-  disabled?: boolean 
-  title?: string 
-
+  disabled?: boolean
+  title?: string
 }
 
-function MenuItem({icon, label, shortcut, onClick, disabled, title}: MenuItemProps): JSX.Element {
+function MenuItem({ icon, label, shortcut, onClick, disabled, title }: MenuItemProps): JSX.Element {
   return (
-    
+    <button onClick={onClick} disabled={disabled} className="menu-row" title={title}>
+      <span className="shrink-0 text-muted">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {shortcut && <span className="shrink-0 text-[12px] text-faint">{shortcut}</span>}
+    </button>
   )
 }
 
-function AccountRow(): JSX.Element { 
+/**
+ * Hàng tài khoản đầu menu.
+ *
+ * Đọc phiên THẬT thay vì một hằng số cứng. Trước đây hàng này luôn hiện
+ * "admin — Đã đăng nhập" cho mọi người, kể cả khi chưa ai đăng nhập: menu nói
+ * một đằng, máy chủ áp một nẻo.
+ */
+function AccountRow(): JSX.Element {
+  const user = useSessionStore((state) => state.user)
+  const isAdmin = user?.role === 'ADMIN'
+
   return (
-
+    <button
+      className="menu-row py-2"
+      title={user ? 'Quản lý tài khoản ở nút avatar trên thanh công cụ' : 'Chưa đăng nhập'}
+    >
+      <span
+        className={
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ' +
+          (user
+            ? isAdmin
+              ? 'bg-gradient-to-br from-indigo-500 to-violet-500 text-white'
+              : 'bg-gradient-to-br from-sky-500 to-teal-400 text-white'
+            : 'border border-line bg-raised text-muted')
+        }
+      >
+        {user ? user.username.slice(0, 2).toUpperCase() : '—'}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-ink">
+          {user ? user.username : 'Chưa đăng nhập'}
+        </span>
+        <span className={'block truncate text-[12px] ' + (isAdmin ? 'text-success' : 'text-muted')}>
+          {user ? (isAdmin ? 'Quản trị viên' : 'Người dùng') : 'Bấm avatar để đăng nhập'}
+        </span>
+      </span>
+      <ChevronRightIcon className="h-4 w-4 shrink-0 text-faint" />
+    </button>
   )
-
 }
 
 function ZoomRow({ onClose, enabled }: { onClose: () => void; enabled: boolean }): JSX.Element {
-  const factor = useZoomStore((s) => s.factor)
-  const zoomIn = useZoomStore((s) => s.zoomIn)
-  const zoomOut = useZoomStore((s) => s.zoomOut)
-  const reset = useZoomStore((s) => s.reset)
+  const activeTabId = useTabStore((state) => state.activeTabId)
+  const factor = useZoomStore((state) => zoomFactorOf(state.factors, activeTabId))
+  const zoomIn = useZoomStore((state) => state.zoomIn)
+  const zoomOut = useZoomStore((state) => state.zoomOut)
+  const reset = useZoomStore((state) => state.reset)
 
   const button =
+    'flex h-7 w-7 items-center justify-center rounded-full text-muted transition-colors ' +
+    'hover:bg-line hover:text-ink focus-visible:outline-none focus-visible:ring-2 ' +
+    'focus-visible:ring-brand/60 disabled:pointer-events-none disabled:text-faint/50'
 
   return (
-
+    <div
+      className="flex items-center gap-3 px-2.5 py-1.5 text-[13px] text-ink"
+      title={enabled ? undefined : 'Chỉ thu phóng được trang web mở trong thẻ.'}
+    >
+      <span className="flex-1">Thu phóng</span>
+      <button onClick={zoomOut} disabled={!enabled} className={button} aria-label="Thu nhỏ">
+        <MinusIcon className="h-4 w-4" />
+      </button>
+      <button
+        onClick={reset}
+        disabled={!enabled}
+        className="w-12 shrink-0 rounded-md py-0.5 text-center text-[13px] tabular-nums text-ink
+                   transition-colors hover:bg-line focus-visible:outline-none
+                   disabled:pointer-events-none disabled:text-faint/60"
+        aria-label="Đặt lại thu phóng về 100%"
+        title="Đặt lại về 100%"
+      >
+        {Math.round(factor * 100)}%
+      </button>
+      <button onClick={zoomIn} disabled={!enabled} className={button} aria-label="Phóng to">
+        <PlusIcon className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => {
+          window.win.toggleFullScreen()
+          onClose()
+        }}
+        className={button}
+        aria-label="Toàn màn hình"
+        title="Toàn màn hình (F11)"
+      >
+        <FullscreenIcon className="h-4 w-4" />
+      </button>
+    </div>
   )
 }
 
-function HistoryItem({ onClose }: { onClose:() => void }): JSX.Element {
+function HistoryItem({ onClose }: { onClose: () => void }): JSX.Element {
   const [open, setOpen] = useState(false)
   const timer = useRef<number | undefined>(undefined)
 
-  const recentUrls = useHistoryStore((s) => s.recentUrls)
-  const histories = useHistoryStore((s) => s.histories)
-  const navigate = useTabStore((s) => s.navigate)
+  const navigate = useTabStore((state) => state.navigate)
+  const recent = useHistoryStore(
+    useShallow((state) => state.recentUrls(8).filter((url) => url !== HOME_URL))
+  )
 
-  void histories
-  const recent = recentUrl(8).filter((url) => url !== HOME_URL)
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   function show(): void {
@@ -206,7 +286,7 @@ function HistoryItem({ onClose }: { onClose:() => void }): JSX.Element {
 
   function hideSoon(): void {
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setOpen(false), 180) 
+    timer.current = window.setTimeout(() => setOpen(false), 180)
   }
 
   return (
@@ -231,7 +311,9 @@ function HistoryItem({ onClose }: { onClose:() => void }): JSX.Element {
           </p>
 
           {recent.length === 0 ? (
-            <p className="px-2.5 pb-2 text-[12px] text-faint">Chưa ghé trang nào trong phiên này.</p>
+            <p className="px-2.5 pb-2 text-[12px] text-faint">
+              Chưa ghé trang nào trong phiên này.
+            </p>
           ) : (
             recent.map((url) => (
               <button
@@ -271,6 +353,5 @@ function HistoryItem({ onClose }: { onClose:() => void }): JSX.Element {
     </div>
   )
 }
-
 
 export default BrowserMenu

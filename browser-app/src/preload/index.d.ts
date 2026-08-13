@@ -1,4 +1,4 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
+import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { BrowserApi, WindowApi } from './index'
 
 declare global {
@@ -6,7 +6,6 @@ declare global {
     electron: ElectronAPI
     browser: BrowserApi
     win: WindowApi
-    api: unknown
   }
 }
 

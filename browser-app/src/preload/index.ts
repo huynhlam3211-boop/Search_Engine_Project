@@ -1,18 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { TabState } from '../main/tabManager'
-
-type TabsPayload = { tabs: TabState[]; activeTabId: string | null }
+import type { TabsSnapshot } from '../main/tabManager'
 
 const browserApi = {
-  listTabs: (): Promise<TabsPayload> => ipcRenderer.invoke('browser:listTabs'),
-  createTab: (url?: string): Promise<string> => ipcRenderer.invoke('browser:createTab', url),
+  listTabs: (): Promise<TabsSnapshot> => ipcRenderer.invoke('browser:listTabs'),
+  newTab: (url?: string): Promise<string> => ipcRenderer.invoke('browser:newTab', url),
   closeTab: (id: string): Promise<void> => ipcRenderer.invoke('browser:closeTab', id),
   switchTab: (id: string): Promise<void> => ipcRenderer.invoke('browser:switchTab', id),
   navigate: (id: string, url: string): Promise<void> =>
     ipcRenderer.invoke('browser:navigate', id, url),
-  goBack: (id: string): Promise<void> => ipcRenderer.invoke('browser:goBack', id),
-  goForward: (id: string): Promise<void> => ipcRenderer.invoke('browser:goForward', id),
   reload: (id: string): Promise<void> => ipcRenderer.invoke('browser:reload', id),
   print: (id: string): Promise<void> => ipcRenderer.invoke('browser:print', id),
   setZoom: (id: string, factor: number): Promise<void> =>
@@ -21,14 +17,13 @@ const browserApi = {
   setPanelWidth: (px: number): void => ipcRenderer.send('browser:setPanelWidth', px),
   setOverlay: (active: boolean): void => ipcRenderer.send('browser:setOverlay', active),
 
-  // Tra ve ham huy dang ky de React goi trong phan cleanup cua useEffect.
-  onTabsChanged: (cb: (payload: TabsPayload) => void): (() => void) => {
-    const listener = (_e: unknown, payload: TabsPayload): void => cb(payload)
+  onTabsChanged: (callback: (snapshot: TabsSnapshot) => void): (() => void) => {
+    const listener = (_e: unknown, snapshot: TabsSnapshot): void => callback(snapshot)
     ipcRenderer.on('browser:tabs', listener)
     return () => ipcRenderer.removeListener('browser:tabs', listener)
   },
-  onShortcut: (cb: (name: string) => void): (() => void) => {
-    const listener = (_e: unknown, name: string): void => cb(name)
+  onShortcut: (callback: (name: string) => void): (() => void) => {
+    const listener = (_e: unknown, name: string): void => callback(name)
     ipcRenderer.on('browser:shortcut', listener)
     return () => ipcRenderer.removeListener('browser:shortcut', listener)
   }
@@ -36,13 +31,16 @@ const browserApi = {
 
 const windowApi = {
   minimize: (): void => ipcRenderer.send('win:minimize'),
-  toggleMaximize: (): void => ipcRenderer.send('win:toggleMaximize'),
   close: (): void => ipcRenderer.send('win:close'),
+  toggleFullScreen: (): void => ipcRenderer.send('win:toggleFullScreen'),
+  dragStart: (): void => ipcRenderer.send('win:dragStart'),
+  dragEnd: (): void => ipcRenderer.send('win:dragEnd'),
   isMaximized: (): Promise<boolean> => ipcRenderer.invoke('win:isMaximized'),
-  onMaximizedChanged: (cb: (maximized: boolean) => void): (() => void) => {
-    const listener = (_e: unknown, maximized: boolean): void => cb(maximized)
-    ipcRenderer.on('win:maximizedChanged', listener)
-    return () => ipcRenderer.removeListener('win:maximizedChanged', listener)
+  toggleMaximize: (): Promise<boolean> => ipcRenderer.invoke('win:toggleMaximize'),
+  onMaximizeChanged: (callback: (maximized: boolean) => void): (() => void) => {
+    const listener = (_e: unknown, maximized: boolean): void => callback(maximized)
+    ipcRenderer.on('win:maximizeChanged', listener)
+    return () => ipcRenderer.removeListener('win:maximizeChanged', listener)
   }
 }
 
@@ -58,9 +56,6 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // Nhanh nay chi chay khi contextIsolation bi tat. Phai ep kieu vi
-  // src/preload/index.d.ts khong nam trong chuong trinh tsconfig.node:
-  // TypeScript coi no la file khai bao cua chinh index.ts nen bo qua.
   const globals = window as unknown as Record<string, unknown>
   globals.electron = electronAPI
   globals.browser = browserApi
