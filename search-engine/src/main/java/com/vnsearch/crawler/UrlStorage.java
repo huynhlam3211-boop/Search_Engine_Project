@@ -24,6 +24,7 @@ public class UrlStorage implement Closeale {
         this.path = path;
     }
 
+    /** Chế độ tắt — không lưu gì, không đụng đĩa. */
     public static UrlStorage disabled(){
         return new UrlStorage(null);
     }

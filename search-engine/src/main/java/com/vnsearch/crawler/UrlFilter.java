@@ -22,7 +22,22 @@ public class UrlFilter {
         // đa phương 
         "mp3", "mp4", "avi", "mkv", "mov", "wmv", "flv", "wav", "m4a", "webm");
 
+    public static final Set<String> NON_VI_EN_HOST_PREFIXES = Set.of(
+            "cn.", "zh.",           // tieng Trung
+            "ja.", "jp.",           // tieng Nhat
+            "ko.", "kr.",           // tieng Han
+            "ru.",                  // tieng Nga
+            "fr.",                  // tieng Phap
+            "es.",                  // tieng Tay Ban Nha
+            "de.",                  // tieng Duc
+            "pt.",                  // tieng Bo Dao Nha
+            "ar.",                  // tieng A Rap
+            "th.",                  // tieng Thai
+            "lo.", "km.");          // tieng Lao, tieng Khmer
+    
+
     private final Set<String> allowedDomains;
+    private final Set<String> excludedHostPrefixes;
     private final int maxDepth;
     private final RobotsTxtParser robotsTxtParser;
     private final String userAgent;
@@ -30,23 +45,33 @@ public class UrlFilter {
     private final AtomicLong rejectedByDepth = new AtomicLong();
     private final AtomicLong rejectedByScheme = new AtomicLong();
     private final AtomicLong rejectedByDomain = new AtomicLong();
+    private final AtomicLong rejectedByHostPrefix = new AtomicLong();
     private final AtomicLong rejectedByExtension = new AtomicLong();
     private final AtomicLong rejectedByRobots = new AtomicLong();
     private final AtomicLong accepted = new AtomicLong();
 
-
     public UrlFilter(Set<String> allowedDomains, int maxDepth) {
+        this(allowedDomains, maxDepth, Set.of(), new RobotsTxtParser(), HtmlDownloader.USER_AGENT);
+    }
+
+    public UrlFilter(Set<String> allowedDomains, int maxDepth, Set<String> excludedHostPrefixes) {
         this(allowedDomains, maxDepth, new RobotsTxtParser(), HtmlDowloader.USER_AGENT);
     }
 
-    
     public UrlFilter(Set<String> allowedDomains, int maxDepth,
-                    RobotsTxtParser robotsTxtParser, String userAgent) {
+                      RobotsTxtParser robotsTxtParser, String userAgent) {
+        this(allowedDomains, maxDepth, Set.of(), robotsTxtParser, userAgent);
+    }
+
+    
+    public UrlFilter(Set<String> allowedDomains, int maxDepth, Set<String> excludedHostPrefixes,
+                      RobotsTxtParser robotsTxtParser, String userAgent) {
         
         if (maxDepth < 0){
             throw new IllegalArgumentException("maxDepth phải >= 0, nhận được: " + maxDepth);
         }
         this.allowedDomains = allowedDomains == null ? Set.of() : Set.copyOf(allowedDomains);
+        this.excludedHostPrefixes = excludedHostPrefixes == null ? Set.of() : Set.copyOf(excludedHostPrefixes);
         this.maxDepth = maxDepth;
         this.robotsTxtParser = robotsTxtParser;
         this.userAgent = userAgent;
@@ -124,6 +149,26 @@ public class UrlFilter {
         for (String domain : allowedDomains) {
             String d = domain.toLowerCase(Locale.ROOT);
             if (lower.equals(d) || lower.endsWith("." + d)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Loại các subdomain ngoại ngữ — xem {@link #NON_VI_EN_HOST_PREFIXES}.
+     *
+     * <p>Khớp theo tiền tố có <b>dấu chấm</b> ({@code "en."} chứ không phải
+     * {@code "en"}) để {@code enviro.example.vn} hay {@code endorse.example.vn}
+     * không bị loại oan.
+     */
+    private boolean hasExcludedHostPrefix(String host) {
+        if (excludedHostPrefixes.isEmpty()) {
+            return false;
+        }
+        String lower = host.toLowerCase(Locale.ROOT);
+        for (String prefix : excludedHostPrefixes) {
+            if (lower.startsWith(prefix)) {
                 return true;
             }
         }

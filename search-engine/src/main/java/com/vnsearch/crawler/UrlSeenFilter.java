@@ -4,7 +4,10 @@ import com.vnsearch.datastructure.BloomFilter;
 
 public class UrlSeenFilter {
 
+    /**Ước lượng số URL SẼ GẶP trên mỗi trang SẼ LƯU. */
     public static final int URLS_SEEN_PER_PAGE = 200;
+
+    /** Sàn kích thước, để phiên crawl nhỏ vẫn có bộ lọc đủ thưa. */
     public static final int MIN_EXPECTED_URLS = 200000;
     public static final int MAX_EXPECTED_URL = 50_000_000;
 

@@ -1,6 +1,7 @@
 package com.vnsearch.crawler;
 import java.util.Set;
 
+/*<b>Builder pattern</b> */
 public class CrawlConfig {
     private final int maxDepth;
     private final int maxPages;
