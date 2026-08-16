@@ -6,6 +6,7 @@ public class CrawlConfig {
     private final int maxPages;
     private final int threadCount;
     private final Set<String> allowedDomains;
+    private final Set<String> excludeHostPrefixes;
     private final int maxDurationMinutes;
     private final String urlStoragePath;
 
@@ -14,6 +15,7 @@ public class CrawlConfig {
         this.maxPages = builder.maxPages;
         this.threadCount = builder.threadCount;
         this.allowedDomains = Set.copyOf(builder.allowedDomains);
+        this.excludeHostPrefixes = Set.copyOf(builder.excludeHostPrefixes);
         this.maxDurationMinutes = builder.maxDurationMinutes;
         this.urlStoragePath = builder.urlStoragePath;
     }
@@ -32,6 +34,10 @@ public class CrawlConfig {
 
     public int threadCount(){
         return threadCount;
+    }
+
+    public Set<String> excludeHostPrefixes(){
+        return excludeHostPrefixes;
     }
 
     public Set<String> allowedDomains() {
@@ -58,6 +64,7 @@ public class CrawlConfig {
         private int maxPages = 100;
         private int threadCount = 4;
         private Set<String> allowedDomains = Set.of();
+        private Set<String> excludeHostPrefixes = Set.of();
         private int maxDurationMinutes = 60;
         private String urlStoragePath = null;
 
@@ -81,6 +88,11 @@ public class CrawlConfig {
 
         public Builder allowedDomains(Set<String> value) {
             this.allowedDomains = value == null ? Set.of() : value;
+            return this;
+        }
+
+        public Builder excludeHostPrefixes(Set<String> value) {
+            this.excludedHostPrefixes = value == null ? Set.of() : value;
             return this;
         }
 

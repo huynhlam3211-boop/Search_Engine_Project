@@ -1,14 +1,25 @@
 package com.vnsearch.crawler;
 
+import com.vnsearch.crawler.bus.CrawlEventBus;
+import com.vnsearch.crawler.bus.DiscoveredUrl;
+import com.vnsearch.crawler.bus.InProcessCrawlEventBus;
+import com.vnsearch.crawler.bus.OutlinksExtracted
+import com.vnsearch.crawler.bus.PageEvent;
 import com.vnsearch.crawler.frontier.CrawlTask;
 import com.vnsearch.crawler.frontier.UrlFrontier;
+import com.vnsearch.crawler.modular.CrawlAnalyticsService;
+import com.vnsearch.crawler.modular.ImageDownloadService;
+import com.vnsearch.crawler.modular.ImageStore;
+import com.vnsearch.crawler.modular.UrlExtractorService;
 import com.vnsearch.model.WebDocument;
+import io.micrometer.core.instrucment.simple.SimpleMeterRegistry;
 import com.org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -17,12 +28,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class CrawlerService {
 
     private static final Logger log = LoggerFactory.getLogger(CrawlerServie.class);
 
     private static final int SEED_BACKLINK_SCORE = 10;
+    private static final int IDLE_CONFIRMATIONS_LOCAL = 3;
+    private static final long IDLE_SLEEP_MS_LOCAL = 200L;
+
+    private static final int IDLE_CONFIRMATIONS_BUS = 15;
+    private static final long IDLE_SLEEP_MS_BUS = 1000L;
 
     private final UrlFrontier frontier = new UrlFrontier();
     private final DnsResolver dnsResolver = new DnsResolver();
@@ -32,13 +49,63 @@ public class CrawlerService {
     private final ContentStorage contentStorage = new ContentStorage();
     private final LinkExtractor linkExtractor = new LinkExtractor();
     
+    private final CrawlEventBus bus;
+
+    private final boolean ownsBus;
+
+    private final AtomicLong orphanOutlinks = new AtomicLong();
+
+    private volatile String jobId = java.util.UUID.randomUUID().toString();
+
+    private final ImageStore imageStore;
+
+    private volatile UrlExtractorService urlExtractorService;
+    private volatile ImageDownloadService imageDownloadService;
+    private volatile CrawlAnalyticsService analyticsService;
+
     private volatile UrlFilter urlFilter = new UrlFilter(Set.of(), Integer.MAX_VALUE);
     private volatile UrlSeenFilter urlSeenFilter = UrlSeenFilter.forMaxPages(1);
 
     private final AtomicInteger pagesCrawled = new AtomicInteger(0);
+
+    private volatile int restoredDocCount = 0;
+
     private final AtomicInteger activeWorkers = new AtomicInteger(0);
 
     private final List<CrawlListener> listeners = new CopyOnWriteArrayList<>();
+
+    public CrawlerService() {
+        this.bus = new InProcessCrawlEventBus();
+        this.ownBus = true;
+        this.imageStore = null;
+    }
+
+    public CrawlerService(CrawlEventBus bus) {
+        this(bus, null);
+    }
+
+    public CrawlerService(CrawlEventBus bus, ImageStore imageStore) {
+        if (bus == null) {
+            this.bus = new InProcessCrawlEventBus();
+            this.ownsBus = true;
+        } else {
+            this.bus = bus;
+            this.ownsBus = false;
+        }
+        this.imageStore = imageStore;
+    }
+
+    private void wireInProcessService() {
+
+    }
+
+    public boolean acceptDiscoveredUrl(DiscoveredUrl discovered) {
+
+    }
+
+    public void acceptOutlinks(OutlinksExtracted outlinks) {
+
+    }
 
     public CrawlerService addListener(CrawlListener listener) {
         if (listener != null) {
@@ -71,6 +138,11 @@ public class CrawlerService {
         long elapsed = System.currentTimeMillis - start;
         notifyFinished(pagesCrawled.get(), elapsed);
         return contentStorage.all();
+    }
+
+    public List<WebDocument> crawl(List<String> seedUrls, CrawlConfig config,
+                                    List<WebDocument> previousDocuments) {
+
     }
 
     // Nạp seed vào frontier
@@ -107,6 +179,10 @@ public class CrawlerService {
 
     }
 
+    private boolean enqueue(String url, int depth) {
+        
+    }
+
     private void notifyPageCrawled(CrawlListener.CrawlEvent event) {
 
     }
@@ -117,6 +193,10 @@ public class CrawlerService {
 
     private void notifyDuplicateContent(String url) {
         
+    }
+
+    private void notifyForeignLanguage(String url, String language) {
+
     }
 
     private void notifyFinished(int totalPages, long elapsedMs) {
@@ -151,7 +231,48 @@ public class CrawlerService {
         return urlSeenFilter;
     }
 
+    public List<WebDocument> snapshotDocument() {
+        return contentStorage.all();
+    }
+
     public ContentSeenFilter getContentSeenFilter() {
         return contentSeenFilter;
+    }
+
+    public LanguageFilter getLanguageFilter() {
+
+    }
+    // -- Modular Service
+
+    public CrawlEventBus getEventBus() {
+
+    }
+
+    public String getJobId() {
+
+    }
+
+    public void setJobId(String jobId){
+
+    }
+
+    public boolean isInProcessModel() {
+
+    }
+
+    public UrlExtractorService getUrlExtractorService() {
+
+    }
+
+    public ImageDownloadService getImageDownloaderService() {
+
+    }
+
+    public CrawlAnalyticsService getAnalyticsService() {
+
+    }
+
+    public long getOrphanOutlinksCount() {
+
     }
 }
