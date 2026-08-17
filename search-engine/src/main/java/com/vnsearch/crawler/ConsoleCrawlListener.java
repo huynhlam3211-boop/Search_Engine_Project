@@ -25,16 +25,16 @@ public class ConsoleCrawlListener implements CrawlListener {
 
     @Override
     public void onError(String url, Exception error){
-        log.warn("Lỗi khi crawl {}: {}", url, error.getMessage());
+        log.warn("Failed to crawl {}: {}", url, error.getMessage());
     }
 
     @Override
     public void onDuplicateContent(String url){
-        log.debug("Nội dung trùng, bỏ qua: {}", url);
+        log.debug("Duplicate content, skipping: {}", url);
     }
 
     @Override
     public void onFinished(int totalPages, long elapsedMs){
-        log.info("Crawl xong: {} trang trong {} ms", totalPages, elapsedMs);
+        log.info("Crawl finished: {} pages in {} ms", totalPages, elapsedMs);
     }
 }

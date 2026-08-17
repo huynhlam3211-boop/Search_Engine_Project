@@ -13,7 +13,7 @@ public final class DefaultPrioritizer implements Prioritizer {
 
     public DefaultPrioritizer(int levels) {
         if (levels <= 0) {
-            throw new IllegalArgumentException("levels phải > 0, nhận được: " + levels);
+            throw new IllegalArgumentException("levels must be > 0, got: " + levels);
         }
         this.levels = levels;
     }
@@ -35,15 +35,14 @@ public final class DefaultPrioritizer implements Prioritizer {
         return Math.max(0, Math.min(level, levels - 1));
     }
 
-    /** Demo minh hoạ nhỏ để chụp màn hình làm báo cáo. */
     public static void main(String[] args) {
         DefaultPrioritizer prioritizer = new DefaultPrioritizer();
-        System.out.println("Số mức ưu tiên: " + prioritizer.levels() + " (0 = cao nhất)");
-        System.out.println("seed .vn        : " + prioritizer.levelOf("https://a.vn", "a.vn", 0, 10));
-        System.out.println("sâu 1, .vn      : " + prioritizer.levelOf("https://a.vn/x", "a.vn", 1, 0));
-        System.out.println("sâu 1, .com     : " + prioritizer.levelOf("https://a.com/x", "a.com", 1, 0));
-        System.out.println("sâu 1, backlink : " + prioritizer.levelOf("https://a.com/y", "a.com", 1, 40));
-        System.out.println("sâu 9           : " + prioritizer.levelOf("https://a.com/z", "a.com", 9, 0));
+        System.out.println("Priority levels: " + prioritizer.levels() + " (0 = highest)");
+        System.out.println("seed .vn          : " + prioritizer.levelOf("https://a.vn", "a.vn", 0, 10));
+        System.out.println("depth 1, .vn      : " + prioritizer.levelOf("https://a.vn/x", "a.vn", 1, 0));
+        System.out.println("depth 1, .com     : " + prioritizer.levelOf("https://a.com/x", "a.com", 1, 0));
+        System.out.println("depth 1, backlink : " + prioritizer.levelOf("https://a.com/y", "a.com", 1, 40));
+        System.out.println("depth 9           : " + prioritizer.levelOf("https://a.com/z", "a.com", 9, 0));
     }
 
 }

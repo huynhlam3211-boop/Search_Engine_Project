@@ -22,7 +22,6 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
     private final AtomicLong urlsPublished = new AtomicLong();
     private final AtomicLong imagesPublished = new AtomicLong();
 
-    /** Đăng ký một Modular Service nhận luồng trang. */
     public InProcessCrawlEventBus subscribePages(PageEventHandler handler) {
         if (handler != null) {
             pageHandlers.add(handler);
@@ -30,7 +29,6 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
         return this;
     }
 
-    /** Đăng ký bên nạp URL vào frontier — thường là {@code CrawlerService} tự nó. */
     public InProcessCrawlEventBus subscribeDiscoveredUrls(Consumer<DiscoveredUrl> handler) {
         if (handler != null) {
             urlHandlers.add(handler);
@@ -38,7 +36,6 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
         return this;
     }
 
-    /** Đăng ký bên ghi outlinks vào Content Storage. */
     public InProcessCrawlEventBus subscribeOutlinks(Consumer<OutlinksExtracted> handler) {
         if (handler != null) {
             outlinkHandlers.add(handler);
@@ -46,7 +43,6 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
         return this;
     }
 
-    /** Đăng ký bên lưu bản ghi ảnh. */
     public InProcessCrawlEventBus subscribeImages(Consumer<ImageFound> handler) {
         if (handler != null) {
             imageHandlers.add(handler);
@@ -65,11 +61,8 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
                 handler.onPage(event);
             } catch (Exception e) {
                 publishFailures.incrementAndGet();
-                // Ghi URL chứ KHÔNG ghi cả sự kiện: toString() của PageEvent đã
-                // cố tình bỏ HTML, nhưng ghi rõ url ở đây vẫn dễ đọc hơn khi
-                // dò log, và không có đường nào để 80 KB lọt vào tệp log.
-                log.warn("Modular Service {} ném ngoại lệ khi xử lý {} — bỏ qua trang này, "
-                                + "các service khác vẫn chạy",
+                log.warn("Modular service {} threw an exception while handling {} — skipping this page, "
+                                + "other services keep running",
                         handler.handlerName(), event.url(), e);
             }
         }
@@ -101,14 +94,13 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
         dispatch(outlinkHandlers, outlinks, "OutlinksExtracted", outlinks.sourceUrl());
     }
 
-    /** Gọi từng handler, cô lập lỗi — cùng chính sách với {@link #publishPage}. */
     private <T> void dispatch(List<Consumer<T>> handlers, T payload, String kind, String subject) {
         for (Consumer<T> handler : handlers) {
             try {
                 handler.accept(payload);
             } catch (Exception e) {
                 publishFailures.incrementAndGet();
-                log.warn("Bên nhận {} ném ngoại lệ khi xử lý {} — bỏ qua", kind, subject, e);
+                log.warn("Subscriber {} threw an exception while handling {} — skipping", kind, subject, e);
             }
         }
     }
@@ -131,7 +123,6 @@ public class InProcessCrawlEventBus implements CrawlEventBus {
         return imagesPublished.get();
     }
 
-    /** Số Modular Service đang lắng nghe luồng trang. */
     public int pageHandlerCount() {
         return pageHandlers.size();
     }

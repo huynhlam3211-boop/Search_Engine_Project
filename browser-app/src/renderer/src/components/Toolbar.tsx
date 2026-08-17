@@ -35,8 +35,8 @@ function Toolbar(): JSX.Element {
           <button
             onClick={() => setExtensionsOpen((open) => !open)}
             className={'icon-btn ' + (extensionsOpen ? 'bg-raised text-ink' : '')}
-            aria-label="Tiện ích mở rộng"
-            title="Tiện ích mở rộng"
+            aria-label="Extensions"
+            title="Extensions"
             aria-expanded={extensionsOpen}
           >
             <PuzzleIcon className="h-[18px] w-[18px]" />
@@ -44,12 +44,12 @@ function Toolbar(): JSX.Element {
           <Popover
             open={extensionsOpen}
             onClose={() => setExtensionsOpen(false)}
-            label="Tiện ích mở rộng"
+            label="Extensions"
             width={270}
           >
             <PopoverNote
-              title="Chưa cài tiện ích nào"
-              body="Trình duyệt này chạy WebContentsView thuần, chưa nạp tiện ích Chrome."
+              title="No extensions installed"
+              body="This browser runs a plain WebContentsView and does not load Chrome extensions."
             />
           </Popover>
         </div>
@@ -64,20 +64,20 @@ function Toolbar(): JSX.Element {
               ? 'bg-brand-soft text-brand'
               : 'text-muted hover:bg-raised hover:text-ink')
           }
-          aria-label="Hỏi AI"
-          title="Hỏi AI"
+          aria-label="Ask AI"
+          title="Ask AI"
           aria-pressed={panelOpen === 'ai'}
         >
           <SparkleIcon className="h-4 w-4" />
-          Hỏi AI
+          Ask AI
         </button>
 
         <div className="relative">
           <button
             onClick={() => setSplitOpen((open) => !open)}
             className={'icon-btn ' + (splitOpen ? 'bg-raised text-ink' : '')}
-            aria-label="Chia đôi màn hình"
-            title="Chia đôi màn hình"
+            aria-label="Split screen"
+            title="Split screen"
             aria-expanded={splitOpen}
           >
             <SplitScreenIcon className="h-[18px] w-[18px]" />
@@ -85,12 +85,12 @@ function Toolbar(): JSX.Element {
           <Popover
             open={splitOpen}
             onClose={() => setSplitOpen(false)}
-            label="Chia đôi màn hình"
+            label="Split screen"
             width={270}
           >
             <PopoverNote
-              title="Chưa hỗ trợ chia đôi màn hình"
-              body={`Cửa sổ hiện có ${tabCount} thẻ, nhưng mỗi lúc chỉ hiển thị được một thẻ.`}
+              title="Split screen is not supported yet"
+              body={`This window has ${tabCount} tabs, but only one can be shown at a time.`}
             />
           </Popover>
         </div>
@@ -98,8 +98,8 @@ function Toolbar(): JSX.Element {
         <button
           onClick={() => openPanel('downloads')}
           className={'icon-btn ' + (panelOpen === 'downloads' ? 'bg-raised text-ink' : '')}
-          aria-label="Tải xuống"
-          title="Tải xuống (Ctrl+J)"
+          aria-label="Downloads"
+          title="Downloads (Ctrl+J)"
         >
           <DownloadIcon className="h-[18px] w-[18px]" />
         </button>
@@ -111,20 +111,17 @@ function Toolbar(): JSX.Element {
               'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] ' +
               'font-bold transition hover:brightness-110 focus-visible:ring-2 ' +
               'focus-visible:ring-brand/60 focus-visible:outline-none ' +
-              // Ba trạng thái, ba diện mạo — avatar phải NÓI THẬT về quyền
-              // hiện tại. Trước đây nó luôn hiện một tài khoản "admin" cứng,
-              // kể cả khi chưa ai đăng nhập.
               (user
                 ? user.role === 'ADMIN'
                   ? 'bg-linear-to-br from-indigo-500 to-violet-500 text-white'
                   : 'bg-linear-to-br from-sky-500 to-teal-400 text-white'
                 : 'border border-line bg-raised text-muted')
             }
-            aria-label={user ? `Tài khoản ${user.username}` : 'Chưa đăng nhập'}
+            aria-label={user ? `Account ${user.username}` : 'Not signed in'}
             title={
               user
-                ? `${user.username} — ${user.role === 'ADMIN' ? 'Quản trị viên' : 'Người dùng'}`
-                : 'Chưa đăng nhập'
+                ? `${user.username} — ${user.role === 'ADMIN' ? 'Administrator' : 'User'}`
+                : 'Not signed in'
             }
             aria-expanded={accountOpen}
           >
@@ -133,7 +130,7 @@ function Toolbar(): JSX.Element {
           <Popover
             open={accountOpen}
             onClose={() => setAccountOpen(false)}
-            label="Tài khoản"
+            label="Account"
             width={280}
           >
             <AccountMenu
@@ -149,8 +146,8 @@ function Toolbar(): JSX.Element {
           <button
             onClick={() => setMenuOpen((open) => !open)}
             className={'icon-btn ' + (menuOpen ? 'bg-raised text-ink' : '')}
-            aria-label="Tuỳ chọn"
-            title="Tuỳ chọn"
+            aria-label="Options"
+            title="Options"
             aria-expanded={menuOpen}
           >
             <MenuIcon className="h-[18px] w-[18px]" />

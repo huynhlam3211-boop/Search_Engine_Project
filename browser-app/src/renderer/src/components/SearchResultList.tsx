@@ -23,15 +23,6 @@ interface SearchOutcome {
   error: string | null
 }
 
-/**
- * Một tab chế độ xem, kiểu gạch chân — quy ước mà Google, Bing và Cốc Cốc
- * đều dùng cho hàng "Tất cả / Hình ảnh / Video".
- *
- * Gạch chân chứ không phải viên thuốc bo tròn: hàng này nằm ngay dưới thanh
- * tìm kiếm, nơi đã có sẵn nút bo tròn "Điểm số". Dùng hai hình dạng khác nhau
- * cho hai loại điều khiển khác nhau giúp mắt phân biệt được "đổi chế độ xem"
- * với "bật một tuỳ chọn".
- */
 function ModeTab({
   active,
   onClick,
@@ -46,8 +37,6 @@ function ModeTab({
   return (
     <button
       onClick={onClick}
-      // aria-current: trình đọc màn hình cần biết tab nào đang mở. Chỉ đổi màu
-      // thì người dùng bàn phím và trình đọc màn hình không nhận ra trạng thái.
       aria-current={active ? 'page' : undefined}
       className={
         'flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] transition ' +
@@ -78,14 +67,9 @@ function SearchResultList(): JSX.Element | null {
 
   const requestKey = `${page}|${query ?? ''}`
 
-  // useCallback: nếu không, mỗi lần render ở đây sinh một hàm mới, React coi
-  // đó là prop đã đổi, và tab Hình ảnh sẽ gọi lại API sau mỗi lần render.
   const handleImageMeta = useCallback((meta: ImageMeta) => setImageMeta(meta), [])
 
   useEffect(() => {
-    // Chỉ gọi API tìm kiếm web khi đang ở tab Web. Ở tab Hình ảnh thì
-    // ImageResultGrid tự lo phần của nó — gọi cả hai là tốn một vòng mạng cho
-    // dữ liệu không ai nhìn.
     if (!query || mode !== 'web') {
       return undefined
     }
@@ -96,9 +80,6 @@ function SearchResultList(): JSX.Element | null {
       .then((response) => {
         if (!cancelled) {
           setOutcome({ key: requestKey, response, error: null })
-          // Chỉ ghi nhận TRANG ĐẦU: bấm sang trang 2 vẫn là cùng một lượt tìm
-          // kiếm, đếm thêm sẽ biến một người kiên nhẫn thành nhiều lượt tìm và
-          // làm hỏng cả tỉ lệ bấm lẫn số "lượt tìm mỗi người".
           if (page === 1) {
             track({
               type: 'search',
@@ -115,7 +96,7 @@ function SearchResultList(): JSX.Element | null {
             key: requestKey,
             response: null,
             error:
-              'Không thể kết nối tới máy chủ tìm kiếm (http://localhost:8080). Hãy chắc chắn backend đang chạy.'
+              'Cannot reach the search server (http://localhost:8080). Make sure the backend is running.'
           })
         }
       })
@@ -130,9 +111,6 @@ function SearchResultList(): JSX.Element | null {
   }
 
   const settled = outcome?.key === requestKey ? outcome : null
-  // Số liệu ảnh chỉ hợp lệ khi nó thuộc về ĐÚNG truy vấn đang xem. Khác truy
-  // vấn = lô đầu chưa về = đang tải. Suy ra như vậy để component con không
-  // phải gọi setState của lớp cha ngay trong effect.
   const imageSettled = imageMeta?.query === query ? imageMeta : null
   const loading = mode === 'web' ? settled === null : imageSettled === null
   const response = outcome?.response ?? null
@@ -140,21 +118,19 @@ function SearchResultList(): JSX.Element | null {
   const totalPages = response ? Math.max(1, Math.ceil(response.totalResults / PAGE_SIZE)) : 1
   const showSkeleton = settled === null && !response
 
-  // Lưới ảnh cần rộng hơn danh sách liên kết: bốn cột ở màn hình lớn thì
-  // max-w-3xl (768px) chỉ cho ra những ô bé xíu.
   const containerWidth = mode === 'images' ? 'max-w-6xl' : 'max-w-3xl'
 
   const metaLine = (): string => {
     if (mode === 'images') {
-      if (!imageSettled) return 'Đang tìm ảnh…'
-      return `${imageSettled.total.toLocaleString('vi-VN')} ảnh · ${(
+      if (!imageSettled) return 'Searching images…'
+      return `${imageSettled.total.toLocaleString('en-US')} images · ${(
         imageSettled.timeTakenMs / 1000
-      ).toFixed(3)} giây`
+      ).toFixed(3)} seconds`
     }
-    if (!response) return 'Đang tìm kiếm…'
-    return `Khoảng ${response.totalResults.toLocaleString('vi-VN')} kết quả · ${(
+    if (!response) return 'Searching…'
+    return `About ${response.totalResults.toLocaleString('en-US')} results · ${(
       response.timeTakenMs / 1000
-    ).toFixed(3)} giây`
+    ).toFixed(3)} seconds`
   }
 
   return (
@@ -177,27 +153,26 @@ function SearchResultList(): JSX.Element | null {
                   ? 'border-brand/40 bg-brand-soft text-brand'
                   : 'border-line text-muted hover:bg-raised hover:text-ink')
               }
-              title="Hiện điểm BM25 / PageRank của từng kết quả"
+              title="Show the BM25 / PageRank score of each result"
             >
               <SlidersIcon className="h-3.5 w-3.5" />
-              Điểm số
+              Scores
             </button>
           )}
         </div>
 
-        {/* Hai tab, ngay dưới thanh tìm kiếm — đúng chỗ mọi trình duyệt đặt. */}
         <div className={`mx-auto flex ${containerWidth} items-center gap-1 px-6`}>
           <ModeTab
             active={mode === 'web'}
             onClick={() => setMode('web')}
             icon={<SearchIcon className="h-3.5 w-3.5" />}
-            label="Tất cả"
+            label="All"
           />
           <ModeTab
             active={mode === 'images'}
             onClick={() => setMode('images')}
             icon={<GridAppsIcon className="h-3.5 w-3.5" />}
-            label="Hình ảnh"
+            label="Images"
           />
         </div>
       </div>
@@ -217,7 +192,7 @@ function SearchResultList(): JSX.Element | null {
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-warn/25 bg-warn/5 px-4 py-3">
                 <AlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
                 <p className="text-[13px] leading-relaxed text-warn">
-                  Không có kết quả nào chứa đủ mọi từ khoá. Đã bỏ qua:{' '}
+                  No result contains every keyword. Dropped:{' '}
                   <span className="font-medium">
                     {response.droppedTerms.map((term) => term.replace(/_/g, ' ')).join(', ')}
                   </span>
@@ -254,16 +229,9 @@ function SearchResultList(): JSX.Element | null {
 
                   <button
                     onClick={() => {
-                      // Ghi nhận TRƯỚC khi điều hướng: `navigate` thay cả
-                      // khung nội dung, và thứ tự ngược lại sẽ để sự kiện phải
-                      // đua với việc trang bị thay (đó cũng là lý do lời gọi
-                      // dùng cờ `keepalive`).
                       track({
                         type: 'click',
                         url: result.url,
-                        // Hạng TUYỆT ĐỐI trong toàn bộ kết quả, không phải vị
-                        // trí trong trang: bấm mục đầu của trang 3 là hạng 21,
-                        // và đó mới là con số nói lên chất lượng xếp hạng.
                         position: (page - 1) * PAGE_SIZE + index + 1
                       })
                       navigate(result.url)
@@ -286,7 +254,7 @@ function SearchResultList(): JSX.Element | null {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <ScoreChip label="score" value={result.score.toFixed(4)} />
                       <ScoreChip label="pageRank" value={result.pageRankScore.toFixed(6)} />
-                      <ScoreChip label="hạng" value={`#${(page - 1) * PAGE_SIZE + index + 1}`} />
+                      <ScoreChip label="rank" value={`#${(page - 1) * PAGE_SIZE + index + 1}`} />
                     </div>
                   )}
                 </li>
@@ -296,9 +264,9 @@ function SearchResultList(): JSX.Element | null {
             {response && response.results.length === 0 && !loading && !error && (
               <div className="flex flex-col items-center gap-2 py-20 text-center">
                 <SearchIcon className="h-9 w-9 text-faint" />
-                <p className="text-[15px] text-ink">Không tìm thấy kết quả nào.</p>
+                <p className="text-[15px] text-ink">No results found.</p>
                 <p className="max-w-sm text-[13px] text-muted">
-                  Thử bớt từ khoá, kiểm tra chính tả, hoặc bỏ bộ lọc{' '}
+                  Try fewer keywords, check the spelling, or drop the{' '}
                   <code className="text-brand">site:</code>.
                 </p>
               </div>
@@ -361,10 +329,10 @@ function Pagination({
     'hover:bg-raised hover:text-ink disabled:pointer-events-none disabled:opacity-40'
 
   return (
-    <nav className="mt-12 flex items-center justify-center gap-1" aria-label="Phân trang">
+    <nav className="mt-12 flex items-center justify-center gap-1" aria-label="Pagination">
       <button disabled={page <= 1} onClick={() => onChange(page - 1)} className={arrowClass}>
         <ChevronLeftIcon className="h-4 w-4" />
-        Trước
+        Previous
       </button>
 
       {pages.map((p) => (

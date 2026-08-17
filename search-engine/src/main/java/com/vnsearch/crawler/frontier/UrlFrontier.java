@@ -22,7 +22,6 @@ public class UrlFrontier {
     private final FrontQueues frontQueues;
     private final BackQueues backQueues;
 
-    /** Chống xếp hàng trùng: chính xác tuyệt đối, khác với Bloom Filter ở tầng crawler. */
     private final Set<String> enqueued = new HashSet<>();
 
     private final Object lock = new Object();
@@ -40,20 +39,13 @@ public class UrlFrontier {
                 DEFAULT_BACK_QUEUE_COUNT);
     }
 
-    /**
-     * @param maxSize        số URL đang chờ tối đa
-     * @param prioritizer    chính sách xếp mức ưu tiên
-     * @param selector       chính sách chọn hàng đợi trước
-     * @param backQueueCount số host được phép hoạt động cùng lúc
-     */
-
     public UrlFrontier(int maxSize, Prioritizer prioritizer, FrontQueueSelector selector,
                         int backQueueCount) {
         if (maxSize <= 0) {
-            throw new IllegalArgumentException("maxSize phải > 0, nhận được: " + maxSize);
+            throw new IllegalArgumentException("maxSize must be > 0, got: " + maxSize);
         }
         if (prioritizer == null) {
-            throw new IllegalArgumentException("prioritizer không được null");
+            throw new IllegalArgumentException("prioritizer must not be null");
         }
         this.maxSize = maxSize;
         this.prioritizer = prioritizer;
@@ -66,8 +58,6 @@ public class UrlFrontier {
         if (url == null || url.isBlank()) {
             return false;
         }
-        // Phân tích URL một lần duy nhất, ngoài khối khoá; host đi theo
-        // CrawlTask nên cả prioritizer lẫn tầng sau không phải phân tích lại.
         String host = hostOf(url);
         CrawlTask task = new CrawlTask(url, host != null ? host : url, depth);
         int level = prioritizer.levelOf(url, task.host(), depth, knownBacklinks);
@@ -80,7 +70,7 @@ public class UrlFrontier {
                 droppedDueToCapacity++;
                 return false;
             }
-            frontQueues.add(task, level);       // Prioritizer -> f1..fn
+            frontQueues.add(task, level);
             enqueued.add(url);
             pendingPerHost.merge(task.host(), 1, Integer::sum);
             totalSize++;
@@ -88,13 +78,6 @@ public class UrlFrontier {
         }
     }
 
-    /**
-     * Lấy URL kế tiếp nên crawl.
-     *
-     * <p>Blocking: nếu frontier còn URL nhưng mọi host đều đang trong thời
-     * gian hoãn, luồng sẽ ngủ rồi thử lại. Trả về {@code null} khi hàng đợi
-     * thật sự rỗng — tín hiệu để crawler cân nhắc dừng.
-     */
     public CrawlTask nextUrl() {
         while (true) {
             long sleepMs;
@@ -102,10 +85,10 @@ public class UrlFrontier {
                 if (totalSize == 0) {
                     return null;
                 }
-                backQueues.refillFrom(frontQueues);          // Back queue router
+                backQueues.refillFrom(frontQueues);
 
                 long now = System.currentTimeMillis();
-                CrawlTask task = backQueues.poll(now);       // Back queue selector
+                CrawlTask task = backQueues.poll(now);
                 if (task != null) {
                     enqueued.remove(task.url());
                     releaseHost(task.host());
@@ -114,7 +97,6 @@ public class UrlFrontier {
                 }
                 sleepMs = sleepUntilNextSlot(now);
             }
-            // Ngủ NGOÀI khối khoá để không chặn các luồng đang muốn addUrl.
             try {
                 Thread.sleep(sleepMs);
             } catch (InterruptedException e) {
@@ -124,11 +106,10 @@ public class UrlFrontier {
         }
     }
 
-    /** Ngủ vừa đủ tới lúc hàng đợi sớm nhất khả dụng, nhưng không quá {@link #MAX_SLEEP_MS}. */
     private long sleepUntilNextSlot(long now) {
         long earliest = backQueues.earliestAvailableAt();
         if (earliest == Long.MAX_VALUE) {
-            return MAX_SLEEP_MS; // không hàng đợi sau nào còn hàng, chỉ chờ URL mới
+            return MAX_SLEEP_MS;
         }
         return Math.min(MAX_SLEEP_MS, Math.max(1L, earliest - now));
     }
@@ -157,56 +138,48 @@ public class UrlFrontier {
         }
     }
 
-    /** Số host phân biệt đang có URL chờ, tính trên cả hai tầng. */
     public int domainCount() {
         synchronized (lock) {
             return pendingPerHost.size();
         }
     }
 
-    /** Số URL bị bỏ do frontier đã đầy - dùng cho thống kê/báo cáo. */
     public long getDroppedDueToCapacity() {
         synchronized (lock) {
             return droppedDueToCapacity;
         }
     }
 
-    /** Số URL đang nằm ở tầng trước (chưa được định tuyến về host). */
     public int frontQueueSize() {
         synchronized (lock) {
             return frontQueues.size();
         }
     }
 
-    /** Số URL đang nằm ở tầng sau (đã gán host, chờ tới lượt). */
     public int backQueueSize() {
         synchronized (lock) {
             return backQueues.pendingCount();
         }
     }
 
-
-    /** Số host đang chiếm một hàng đợi sau — trần là số hàng đợi sau. */
     public int activeHostCount() {
         synchronized (lock) {
             return backQueues.boundHostCount();
         }
     }
 
-    /** Demo minh hoạ nhỏ để chụp màn hình làm báo cáo. */
     public static void main(String[] args) {
-        // Bộ chọn tất định để đầu ra của demo lặp lại được.
         UrlFrontier frontier = new UrlFrontier(DEFAULT_MAX_SIZE, new DefaultPrioritizer(),
                 new StrictPrioritySelector(), DEFAULT_BACK_QUEUE_COUNT);
 
         frontier.addUrl("https://example.com/a", 1, 2);
-        frontier.addUrl("https://congty.gov.vn/b", 1, 2); // domain .vn -> nâng một bậc ưu tiên
-        frontier.addUrl("https://example.com/c", 3, 0);   // sâu hơn -> mức thấp hơn
+        frontier.addUrl("https://company.gov.vn/b", 1, 2);
+        frontier.addUrl("https://example.com/c", 3, 0);
 
-        System.out.println("Số host đang chờ: " + frontier.domainCount());
-        System.out.println("Task 1 (ưu tiên cao nhất, phải là domain .vn): " + frontier.nextUrl());
+        System.out.println("Pending hosts: " + frontier.domainCount());
+        System.out.println("Task 1 (highest priority, must be a .vn domain): " + frontier.nextUrl());
         System.out.println("Task 2: " + frontier.nextUrl());
-        System.out.println("Task 3 (sâu nhất -> ưu tiên thấp nhất): " + frontier.nextUrl());
-        System.out.println("Còn lại: " + frontier.size());
+        System.out.println("Task 3 (deepest -> lowest priority): " + frontier.nextUrl());
+        System.out.println("Remaining: " + frontier.size());
     }
 }

@@ -41,8 +41,8 @@ function TabBar(): JSX.Element {
           className="mb-1 ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg
                      text-muted transition-colors hover:bg-surface/70 hover:text-ink
                      focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:outline-none"
-          aria-label="Tab mới"
-          title="Tab mới (trang chủ VnSearch)"
+          aria-label="New tab"
+          title="New tab (VnSearch home)"
         >
           <PlusIcon className="h-4 w-4" />
         </button>
@@ -65,7 +65,7 @@ interface TabProps {
 
 function Tab({ tab, active, single, onSelect, onClose }: TabProps): JSX.Element {
   const isHome = tab.url === HOME_URL
-  const label = tab.loading ? 'Đang tải…' : isHome ? 'Trang chủ VnSearch' : tab.title || tab.url
+  const label = tab.loading ? 'Loading…' : isHome ? 'VnSearch home' : tab.title || tab.url
 
   return (
     <div
@@ -76,7 +76,7 @@ function Tab({ tab, active, single, onSelect, onClose }: TabProps): JSX.Element 
           onClose()
         }
       }}
-      title={isHome ? 'Trang chủ VnSearch' : `${tab.title}\n${tab.url}`}
+      title={isHome ? 'VnSearch home' : `${tab.title}\n${tab.url}`}
       className={
         'group relative flex h-[34px] min-w-0 max-w-[240px] flex-1 cursor-default items-center ' +
         'gap-2 rounded-t-[10px] pr-1.5 pl-2.5 text-[13px] transition-colors duration-150 ' +
@@ -125,8 +125,8 @@ function Tab({ tab, active, single, onSelect, onClose }: TabProps): JSX.Element 
           'focus-visible:ring-brand/60 focus-visible:outline-none ' +
           (active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')
         }
-        aria-label={`Đóng tab ${label}`}
-        title="Đóng tab"
+        aria-label={`Close tab ${label}`}
+        title="Close tab"
       >
         <CloseIcon className="h-3 w-3" strokeWidth={2.2} />
       </button>
@@ -151,16 +151,16 @@ function WindowControls(): JSX.Element {
       <button
         onClick={() => window.win.minimize()}
         className={buttonClass}
-        aria-label="Thu nhỏ"
-        title="Thu nhỏ"
+        aria-label="Minimize"
+        title="Minimize"
       >
         <WinMinimizeIcon className="h-[10px] w-[10px]" />
       </button>
       <button
         onClick={() => window.win.toggleMaximize().then(setMaximized)}
         className={buttonClass}
-        aria-label={maximized ? 'Khôi phục cửa sổ' : 'Phóng to'}
-        title={maximized ? 'Khôi phục cửa sổ' : 'Phóng to'}
+        aria-label={maximized ? 'Restore window' : 'Maximize'}
+        title={maximized ? 'Restore window' : 'Maximize'}
       >
         {maximized ? (
           <WinRestoreIcon className="h-[10px] w-[10px]" />
@@ -171,8 +171,8 @@ function WindowControls(): JSX.Element {
       <button
         onClick={() => window.win.close()}
         className={buttonClass + ' hover:bg-[#c42b1c]! hover:text-white!'}
-        aria-label="Đóng cửa sổ"
-        title="Đóng"
+        aria-label="Close window"
+        title="Close"
       >
         <WinCloseIcon className="h-[10px] w-[10px]" />
       </button>

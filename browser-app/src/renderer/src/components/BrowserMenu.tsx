@@ -50,30 +50,30 @@ function BrowserMenu({ open, onClose }: BrowserMenuProps): JSX.Element {
   }
 
   return (
-    <Popover open={open} onClose={onClose} width={304} label="Menu trình duyệt">
+    <Popover open={open} onClose={onClose} width={304} label="Browser menu">
       <AccountRow />
 
       <div className="menu-sep" />
 
       <MenuItem
         icon={<VnSearchMark className="h-4 w-4" />}
-        label="Thẻ mới"
+        label="New tab"
         shortcut="Ctrl+T"
         onClick={() => run(() => newTab())}
       />
       <MenuItem
         icon={<WindowIcon className="h-[17px] w-[17px]" />}
-        label="Cửa sổ mới"
+        label="New window"
         shortcut="Ctrl+N"
         disabled
-        title="Ứng dụng hiện chỉ chạy một cửa sổ duy nhất."
+        title="The app currently runs in a single window only."
       />
       <MenuItem
         icon={<IncognitoIcon className="h-[17px] w-[17px]" />}
-        label="Cửa sổ ẩn danh mới"
+        label="New incognito window"
         shortcut="Ctrl+Shift+N"
         disabled
-        title="Chưa có phiên duyệt riêng tư tách biệt."
+        title="There is no separate private browsing session yet."
       />
 
       <div className="menu-sep" />
@@ -81,13 +81,13 @@ function BrowserMenu({ open, onClose }: BrowserMenuProps): JSX.Element {
       <HistoryItem onClose={onClose} />
       <MenuItem
         icon={<DownloadIcon className="h-[17px] w-[17px]" />}
-        label="Tải xuống"
+        label="Downloads"
         shortcut="Ctrl+J"
         onClick={() => run(() => openPanel('downloads'))}
       />
       <MenuItem
         icon={<StarIcon className="h-[17px] w-[17px]" />}
-        label="Dấu trang"
+        label="Bookmarks"
         onClick={() => run(() => openPanel('bookmarks'))}
       />
 
@@ -95,16 +95,16 @@ function BrowserMenu({ open, onClose }: BrowserMenuProps): JSX.Element {
 
       <MenuItem
         icon={<PuzzleIcon className="h-[17px] w-[17px]" />}
-        label="Tiện ích mở rộng"
+        label="Extensions"
         disabled
-        title="Chưa nạp tiện ích Chrome."
+        title="No Chrome extensions are loaded."
       />
       <MenuItem
         icon={<TrashIcon className="h-[17px] w-[17px]" />}
-        label="Xoá dữ liệu duyệt web"
+        label="Clear browsing data"
         shortcut="Ctrl+Shift+Del"
         onClick={() => run(clearAll)}
-        title="Dọn hai chồng back/forward của mọi thẻ."
+        title="Clears the back/forward stacks of every tab."
       />
 
       <div className="menu-sep" />
@@ -115,43 +115,43 @@ function BrowserMenu({ open, onClose }: BrowserMenuProps): JSX.Element {
 
       <MenuItem
         icon={<PrintIcon className="h-[17px] w-[17px]" />}
-        label="In…"
+        label="Print…"
         shortcut="Ctrl+P"
         disabled={!onExternalPage}
-        title={onExternalPage ? undefined : 'Chỉ in được trang web đang mở trong thẻ.'}
+        title={onExternalPage ? undefined : 'Only a web page open in a tab can be printed.'}
         onClick={() => run(() => activeTabId && window.browser.print(activeTabId))}
       />
       <MenuItem
         icon={<TranslateIcon className="h-[17px] w-[17px]" />}
-        label="Dịch…"
+        label="Translate…"
         disabled
-        title="Chưa nối với dịch vụ dịch nào."
+        title="No translation service is connected yet."
       />
       <MenuItem
         icon={<SearchIcon className="h-[17px] w-[17px]" />}
-        label="Tìm kiếm trong trang…"
+        label="Find in page…"
         shortcut="Ctrl+F"
         disabled
-        title="Chưa cài phần tìm trong trang."
+        title="Find in page is not implemented yet."
       />
 
       <div className="menu-sep" />
 
       <MenuItem
         icon={<HelpIcon className="h-[17px] w-[17px]" />}
-        label="Trợ giúp"
+        label="Help"
         disabled
-        title="Xem README.md của dự án."
+        title="See the project's README.md."
       />
       <MenuItem
         icon={<SettingsIcon className="h-[17px] w-[17px]" />}
-        label="Cài đặt"
+        label="Settings"
         disabled
-        title="Chưa có trang cài đặt."
+        title="There is no settings page yet."
       />
       <MenuItem
         icon={<ExitIcon className="h-[17px] w-[17px]" />}
-        label="Thoát"
+        label="Exit"
         onClick={() => window.win.close()}
       />
     </Popover>
@@ -177,13 +177,6 @@ function MenuItem({ icon, label, shortcut, onClick, disabled, title }: MenuItemP
   )
 }
 
-/**
- * Hàng tài khoản đầu menu.
- *
- * Đọc phiên THẬT thay vì một hằng số cứng. Trước đây hàng này luôn hiện
- * "admin — Đã đăng nhập" cho mọi người, kể cả khi chưa ai đăng nhập: menu nói
- * một đằng, máy chủ áp một nẻo.
- */
 function AccountRow(): JSX.Element {
   const user = useSessionStore((state) => state.user)
   const isAdmin = user?.role === 'ADMIN'
@@ -191,7 +184,7 @@ function AccountRow(): JSX.Element {
   return (
     <button
       className="menu-row py-2"
-      title={user ? 'Quản lý tài khoản ở nút avatar trên thanh công cụ' : 'Chưa đăng nhập'}
+      title={user ? 'Manage your account from the avatar button on the toolbar' : 'Not signed in'}
     >
       <span
         className={
@@ -207,10 +200,10 @@ function AccountRow(): JSX.Element {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-medium text-ink">
-          {user ? user.username : 'Chưa đăng nhập'}
+          {user ? user.username : 'Not signed in'}
         </span>
         <span className={'block truncate text-[12px] ' + (isAdmin ? 'text-success' : 'text-muted')}>
-          {user ? (isAdmin ? 'Quản trị viên' : 'Người dùng') : 'Bấm avatar để đăng nhập'}
+          {user ? (isAdmin ? 'Administrator' : 'User') : 'Click the avatar to sign in'}
         </span>
       </span>
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-faint" />
@@ -233,10 +226,10 @@ function ZoomRow({ onClose, enabled }: { onClose: () => void; enabled: boolean }
   return (
     <div
       className="flex items-center gap-3 px-2.5 py-1.5 text-[13px] text-ink"
-      title={enabled ? undefined : 'Chỉ thu phóng được trang web mở trong thẻ.'}
+      title={enabled ? undefined : 'Only a web page open in a tab can be zoomed.'}
     >
-      <span className="flex-1">Thu phóng</span>
-      <button onClick={zoomOut} disabled={!enabled} className={button} aria-label="Thu nhỏ">
+      <span className="flex-1">Zoom</span>
+      <button onClick={zoomOut} disabled={!enabled} className={button} aria-label="Zoom out">
         <MinusIcon className="h-4 w-4" />
       </button>
       <button
@@ -245,12 +238,12 @@ function ZoomRow({ onClose, enabled }: { onClose: () => void; enabled: boolean }
         className="w-12 shrink-0 rounded-md py-0.5 text-center text-[13px] tabular-nums text-ink
                    transition-colors hover:bg-line focus-visible:outline-none
                    disabled:pointer-events-none disabled:text-faint/60"
-        aria-label="Đặt lại thu phóng về 100%"
-        title="Đặt lại về 100%"
+        aria-label="Reset zoom to 100%"
+        title="Reset to 100%"
       >
         {Math.round(factor * 100)}%
       </button>
-      <button onClick={zoomIn} disabled={!enabled} className={button} aria-label="Phóng to">
+      <button onClick={zoomIn} disabled={!enabled} className={button} aria-label="Zoom in">
         <PlusIcon className="h-4 w-4" />
       </button>
       <button
@@ -259,8 +252,8 @@ function ZoomRow({ onClose, enabled }: { onClose: () => void; enabled: boolean }
           onClose()
         }}
         className={button}
-        aria-label="Toàn màn hình"
-        title="Toàn màn hình (F11)"
+        aria-label="Full screen"
+        title="Full screen (F11)"
       >
         <FullscreenIcon className="h-4 w-4" />
       </button>
@@ -295,7 +288,7 @@ function HistoryItem({ onClose }: { onClose: () => void }): JSX.Element {
         <span className="shrink-0 text-muted">
           <ClockIcon className="h-[17px] w-[17px]" />
         </span>
-        <span className="min-w-0 flex-1 truncate">Nhật ký</span>
+        <span className="min-w-0 flex-1 truncate">History</span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-faint" />
       </button>
 
@@ -304,15 +297,15 @@ function HistoryItem({ onClose }: { onClose: () => void }): JSX.Element {
           className="absolute right-[calc(100%+8px)] top-0 z-50 w-[290px] animate-scale-in rounded-xl
                      border border-line bg-surface p-1.5 shadow-pop"
           role="menu"
-          aria-label="Nhật ký"
+          aria-label="History"
         >
           <p className="px-2.5 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-faint">
-            Thẻ gần đây
+            Recent tabs
           </p>
 
           {recent.length === 0 ? (
             <p className="px-2.5 pb-2 text-[12px] text-faint">
-              Chưa ghé trang nào trong phiên này.
+              You haven&apos;t visited any page in this session.
             </p>
           ) : (
             recent.map((url) => (
@@ -340,12 +333,12 @@ function HistoryItem({ onClose }: { onClose: () => void }): JSX.Element {
           <div className="menu-sep" />
 
           <p className="px-2.5 py-1.5 text-[12px] font-semibold uppercase tracking-wide text-faint">
-            Các thiết bị của bạn
+            Your devices
           </p>
           <div className="flex items-start gap-3 px-2.5 pb-2 text-[12px] text-faint">
             <DeviceIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span className="leading-relaxed">
-              Chưa đồng bộ thiết bị nào — ứng dụng chưa có máy chủ tài khoản.
+              No devices are synced yet — the app has no account server.
             </span>
           </div>
         </div>

@@ -27,7 +27,6 @@ function SideRail(): JSX.Element {
   const removeItem = useSidePanelStore((s) => s.removeItem)
   const theme = useThemeStore((s) => s.theme)
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
-  // Có quyền quản trị hay không — bất kể quyền đó đến từ tài khoản hay từ khoá API.
   const hasAdmin = useAdminCredential() !== null
   const dashboardOpen = useAdminStore((s) => s.dashboardOpen)
   const openDashboard = useAdminStore((s) => s.openDashboard)
@@ -36,13 +35,13 @@ function SideRail(): JSX.Element {
   return (
     <aside
       className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-line bg-chrome py-2"
-      aria-label="Thanh bên"
+      aria-label="Side rail"
     >
       <button
         onClick={() => togglePanel('add-site')}
         className={'rail-btn ' + (open === 'add-site' ? 'bg-raised text-ink' : '')}
-        aria-label="Thêm trang web vào thanh bên"
-        title="Thêm trang web vào thanh bên"
+        aria-label="Add a site to the side rail"
+        title="Add a site to the side rail"
       >
         <PlusIcon className="h-[18px] w-[18px]" />
       </button>
@@ -64,24 +63,15 @@ function SideRail(): JSX.Element {
       </div>
 
       <div className="mt-1 flex flex-col items-center gap-1 border-t border-line pt-2">
-        {/*
-          Nút vào khu vực quản trị LUÔN hiển thị, kể cả khi chưa có quyền.
 
-          Ẩn nút đi khi chưa đăng nhập là cách làm phổ biến và ở đây nó sai
-          theo hai hướng: nó KHÔNG bảo vệ được gì (máy chủ mới là nơi chặn, và
-          nó chặn bất kể giao diện vẽ ra cái gì), lại còn giấu mất lối vào của
-          chính người có quyền — họ không có cách nào để đăng nhập. Nút hiện,
-          bấm vào thì gặp cửa xác thực: ranh giới quyền được NÓI RA thay vì
-          được che đi.
-        */}
         <button
           onClick={() => (dashboardOpen ? closeDashboard() : openDashboard())}
           className={'rail-btn ' + (dashboardOpen ? 'bg-raised text-ink' : '')}
-          aria-label="Bảng điều khiển quản trị"
+          aria-label="Admin dashboard"
           title={
             hasAdmin
-              ? 'Bảng điều khiển quản trị (đang ở vai trò ADMIN)'
-              : 'Bảng điều khiển quản trị — cần đăng nhập bằng tài khoản quản trị'
+              ? 'Admin dashboard (currently signed in as ADMIN)'
+              : 'Admin dashboard — requires signing in with an admin account'
           }
           aria-pressed={dashboardOpen}
         >
@@ -92,22 +82,22 @@ function SideRail(): JSX.Element {
           )}
         </button>
 
-        <button className="rail-btn" aria-label="Dịch trang" title="Dịch trang này">
+        <button className="rail-btn" aria-label="Translate page" title="Translate this page">
           <TranslateIcon className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={() => togglePanel('downloads')}
           className={'rail-btn ' + (open === 'downloads' ? 'bg-raised text-ink' : '')}
-          aria-label="Nhật ký và tải xuống"
-          title="Nhật ký và tải xuống"
+          aria-label="History and downloads"
+          title="History and downloads"
         >
           <ClockIcon className="h-[18px] w-[18px]" />
         </button>
         <button
           onClick={toggleTheme}
           className="rail-btn"
-          aria-label="Đổi giao diện sáng/tối"
-          title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+          aria-label="Toggle light/dark theme"
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         >
           {theme === 'dark' ? (
             <SunIcon className="h-[18px] w-[18px]" />
@@ -115,7 +105,7 @@ function SideRail(): JSX.Element {
             <MoonIcon className="h-[18px] w-[18px]" />
           )}
         </button>
-        <button className="rail-btn" aria-label="Cài đặt" title="Cài đặt">
+        <button className="rail-btn" aria-label="Settings" title="Settings">
           <SettingsIcon className="h-[18px] w-[18px]" />
         </button>
       </div>
@@ -174,8 +164,8 @@ function RailAppButton({ item, active, onOpen, onRemove }: RailAppButtonProps): 
         className="absolute -right-0.5 -top-0.5 hidden h-4 w-4 items-center justify-center rounded-full
                    bg-raised text-faint shadow-tab transition hover:bg-danger/20 hover:text-danger
                    focus-visible:outline-none group-hover:flex"
-        aria-label={`Gỡ ${label} khỏi thanh bên`}
-        title="Gỡ khỏi thanh bên"
+        aria-label={`Remove ${label} from the side rail`}
+        title="Remove from the side rail"
       >
         <CloseIcon className="h-2.5 w-2.5" strokeWidth={2.6} />
       </button>

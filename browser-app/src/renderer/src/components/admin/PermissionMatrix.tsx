@@ -2,28 +2,11 @@ import type { JSX } from 'react'
 import { useAdminCredential } from '../../store/adminStore'
 import { useSessionStore } from '../../store/sessionStore'
 
-/**
- * Bảng PHÂN QUYỀN: endpoint nào mở cho ai.
- *
- * VÌ SAO MỘT BẢNG NHƯ THẾ NÀY NẰM TRONG SẢN PHẨM, KHÔNG PHẢI TRONG TÀI LIỆU.
- * Luật phân quyền thật nằm trong `SecurityConfig.java`. Bảng này là bản chép
- * lại của nó cho người đọc — và một bản chép lại thì luôn có nguy cơ lệch khỏi
- * bản gốc. Đổi lại là điều mà tài liệu không làm được: người vận hành nhìn
- * thấy ranh giới quyền ngay tại nơi họ đang đứng, cùng lúc với việc thấy vai
- * trò hiện tại của chính mình.
- *
- * Hàng cuối cùng — "vai trò của bạn" — là phần khiến bảng này khác một hình
- * chụp tài liệu: nó đọc trạng thái thật của phiên đang chạy.
- */
-
 interface Rule {
   method: string
   path: string
-  /** Chưa đăng nhập. */
   guest: boolean
-  /** Đã đăng nhập, vai trò USER. */
   user: boolean
-  /** Vai trò ADMIN — dù đến từ tài khoản hay từ khoá X-API-Key. */
   admin: boolean
   note: string
 }
@@ -35,7 +18,7 @@ const RULES: Rule[] = [
     guest: true,
     user: true,
     admin: true,
-    note: 'Tìm kiếm — chức năng chính, KHÔNG đòi đăng nhập'
+    note: 'Search — the core feature, NO sign-in required'
   },
   {
     method: 'GET',
@@ -43,7 +26,7 @@ const RULES: Rule[] = [
     guest: true,
     user: true,
     admin: true,
-    note: 'Gợi ý, ảnh, dòng tin'
+    note: 'Suggestions, images, feed'
   },
   {
     method: 'GET',
@@ -51,7 +34,7 @@ const RULES: Rule[] = [
     guest: true,
     user: true,
     admin: true,
-    note: 'Sức khoẻ — Docker phải gọi được mà không có gì cả'
+    note: 'Health — Docker must be able to call it with nothing at all'
   },
   {
     method: 'POST',
@@ -59,7 +42,7 @@ const RULES: Rule[] = [
     guest: true,
     user: true,
     admin: true,
-    note: 'GHI số liệu: đóng lại thì không còn số liệu nào để đọc'
+    note: 'WRITES metrics: close it and there are no metrics left to read'
   },
   {
     method: 'POST',
@@ -67,7 +50,7 @@ const RULES: Rule[] = [
     guest: true,
     user: true,
     admin: true,
-    note: 'Cửa vào — người chưa có tài khoản phải gõ được'
+    note: 'The front door — someone without an account has to be able to knock'
   },
   {
     method: 'GET',
@@ -75,7 +58,7 @@ const RULES: Rule[] = [
     guest: false,
     user: true,
     admin: true,
-    note: 'Chỉ cần ĐÃ đăng nhập, không phân biệt vai trò'
+    note: 'Only requires being signed in, regardless of role'
   },
   {
     method: 'POST',
@@ -83,7 +66,7 @@ const RULES: Rule[] = [
     guest: false,
     user: true,
     admin: true,
-    note: 'Đổi mật khẩu. Vẫn phải nhập mật khẩu hiện tại'
+    note: 'Change password. The current password is still required'
   },
   {
     method: 'POST',
@@ -91,7 +74,7 @@ const RULES: Rule[] = [
     guest: false,
     user: true,
     admin: true,
-    note: 'Đóng mọi phiên, kể cả phiên đang dùng'
+    note: 'Closes every session, including the one in use'
   },
   {
     method: 'GET',
@@ -99,7 +82,7 @@ const RULES: Rule[] = [
     guest: false,
     user: false,
     admin: true,
-    note: 'ĐỌC số liệu — phơi bày người dùng đang tìm gì'
+    note: 'READS metrics — exposes what users are searching for'
   },
   {
     method: 'GET',
@@ -107,31 +90,31 @@ const RULES: Rule[] = [
     guest: false,
     user: false,
     admin: true,
-    note: 'Danh sách tài khoản (không kèm hash mật khẩu)'
+    note: 'Account list (without password hashes)'
   },
   {
     method: 'POST',
-    path: '/api/admin/users/{tên}/role',
+    path: '/api/admin/users/{name}/role',
     guest: false,
     user: false,
     admin: true,
-    note: 'Nâng/hạ vai trò. Không tự hạ quyền chính mình'
+    note: 'Promote/demote a role. You cannot demote yourself'
   },
   {
     method: 'POST',
-    path: '/api/admin/users/{tên}/disable · enable',
+    path: '/api/admin/users/{name}/disable · enable',
     guest: false,
     user: false,
     admin: true,
-    note: 'Khoá/mở tài khoản mà vẫn giữ dữ liệu'
+    note: 'Disable/enable an account while keeping its data'
   },
   {
     method: 'DELETE',
-    path: '/api/admin/users/{tên}',
+    path: '/api/admin/users/{name}',
     guest: false,
     user: false,
     admin: true,
-    note: 'Xoá hẳn. Không hồi lại được, không tự xoá chính mình'
+    note: 'Deletes for good. Cannot be undone, and you cannot delete yourself'
   },
   {
     method: 'GET',
@@ -139,7 +122,7 @@ const RULES: Rule[] = [
     guest: false,
     user: false,
     admin: true,
-    note: 'Chi tiết vận hành của chỉ mục'
+    note: 'Operational details of the index'
   },
   {
     method: 'POST',
@@ -147,7 +130,7 @@ const RULES: Rule[] = [
     guest: false,
     user: false,
     admin: true,
-    note: 'Khiến máy chủ tải URL tuỳ ý — endpoint rủi ro nhất'
+    note: 'Makes the server fetch arbitrary URLs — the riskiest endpoint'
   },
   {
     method: 'POST',
@@ -155,24 +138,17 @@ const RULES: Rule[] = [
     guest: false,
     user: false,
     admin: true,
-    note: 'Lập lại chỉ mục, tốn tài nguyên'
+    note: 'Rebuilds the index, resource heavy'
   }
 ]
 
-/**
- * Dấu cho một ô.
- *
- * `deniedCode` nói rõ máy chủ trả mã nào, vì hai mã có nghĩa khác nhau:
- * 401 = "tôi không biết anh là ai" (chưa đăng nhập);
- * 403 = "tôi biết anh là ai, và anh không đủ quyền".
- */
 function Mark({ allowed, deniedCode }: { allowed: boolean; deniedCode: 401 | 403 }): JSX.Element {
   return allowed ? (
-    <span className="text-success" title="Được phép">
+    <span className="text-success" title="Allowed">
       ✓
     </span>
   ) : (
-    <span className="text-faint" title={`Bị từ chối (${deniedCode})`}>
+    <span className="text-faint" title={`Denied (${deniedCode})`}>
       ✕
     </span>
   )
@@ -182,8 +158,6 @@ function PermissionMatrix(): JSX.Element {
   const user = useSessionStore((state) => state.user)
   const credential = useAdminCredential()
 
-  // Cột ứng với vai trò hiện tại được tô sáng — bảng này nói về HỆ THỐNG, còn
-  // cột tô nói về BẠN, và hai thứ đó cần phân biệt được bằng mắt.
   const currentColumn = credential ? 'admin' : user ? 'user' : 'guest'
   const columnClass = (column: string): string =>
     column === currentColumn ? 'bg-brand-soft/60' : ''
@@ -194,12 +168,12 @@ function PermissionMatrix(): JSX.Element {
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
             <th className="py-2 pr-3 font-medium">Endpoint</th>
-            <th className={'w-20 py-2 text-center font-medium ' + columnClass('guest')}>Khách</th>
+            <th className={'w-20 py-2 text-center font-medium ' + columnClass('guest')}>Guest</th>
             <th className={'w-24 py-2 text-center font-medium ' + columnClass('user')}>
-              Người dùng
+              User
             </th>
             <th className={'w-20 py-2 text-center font-medium ' + columnClass('admin')}>Admin</th>
-            <th className="py-2 pl-3 font-medium">Vì sao</th>
+            <th className="py-2 pl-3 font-medium">Why</th>
           </tr>
         </thead>
         <tbody>
@@ -227,22 +201,22 @@ function PermissionMatrix(): JSX.Element {
       </table>
 
       <p className="mt-3 text-[11.5px] leading-relaxed text-faint">
-        Cột được tô là vai trò của bạn lúc này:{' '}
+        The highlighted column is your role right now:{' '}
         <span className="font-medium text-ink">
           {credential
             ? credential.kind === 'session'
-              ? `ADMIN — tài khoản ${user?.username}`
-              : 'ADMIN — khoá X-API-Key, không có tài khoản nào đứng sau'
+              ? `ADMIN — account ${user?.username}`
+              : 'ADMIN — X-API-Key admin key, with no account behind it'
             : user
-              ? `NGƯỜI DÙNG — ${user.username}`
-              : 'KHÁCH — chưa đăng nhập'}
+              ? `USER — ${user.username}`
+              : 'GUEST — not signed in'}
         </span>
         .
       </p>
       <p className="mt-1.5 text-[11.5px] leading-relaxed text-faint">
-        Luật thật nằm ở <code>SecurityConfig</code> phía máy chủ; bảng này chỉ là bản chép lại cho
-        người đọc. Ẩn hay hiện nút ở giao diện không thay đổi được gì — một lời gọi{' '}
-        <code>curl</code> không mang bằng chứng quyền vẫn nhận 401.
+        The real rules live in <code>SecurityConfig</code> on the server; this table is only a
+        transcript for the reader. Hiding or showing a button in the UI changes nothing — a{' '}
+        <code>curl</code> call that carries no proof of permission still gets a 401.
       </p>
     </div>
   )

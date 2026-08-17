@@ -51,7 +51,7 @@ public class MultiDomainCrawlerRunner {
         List<WebDocument> previous = List.of();
         if (!fresh && Files.exists(Path.of(outputPath))) {
             previous = ContentStorage.loadFromJson(outputPath);
-            System.out.printf("Noi tiep corpus san co: %d tai lieu tu %s%n", previous.size(), outputPath);
+            System.out.printf("Resuming existing corpus: %d documents from %s%n", previous.size(), outputPath);
         }
 
         ImageStore imageStore = new ImageStore();
@@ -60,7 +60,7 @@ public class MultiDomainCrawlerRunner {
             List<ImageFound> previousImage = ImageStorage.loadQuietly(imagePath);
             if (!previousImages.isEmpty()) {
                 imageStore.addAll(previousImages);
-                System.out.printf("Noi tiep kho anh san co: %d anh tu %s%n",
+                System.out.printf("Resuming existing image store: %d images from %s%n",
                                     previousImage.size(), imagePath);
             }
         }
@@ -74,17 +74,16 @@ public class MultiDomainCrawlerRunner {
             }
         }
 
-        System.out.println(" CRAWL DA DOMAIN ");
-        System.out.printf("Seeds      : %d (%d tieng Viet + %d tieng Anh) tren %d domain%n",
+        System.out.println(" MULTI-DOMAIN CRAWL ");
+        System.out.printf("Seeds      : %d (%d Vietnamese + %d English) across %d domains%n",
                 DEFAULT_SEEDS.size(), VIETNAMESE_SEEDS.size(), ENGLISH_SEEDS.size(),
                 allowedDomains.size());
-        System.out.println("Ngon ngu   : CHI tieng Viet va tieng Anh (LanguageFilter)");
+        System.out.println("Languages  : Vietnamese and English ONLY (LanguageFilter)");
         System.out.println("maxPages   : " + maxPages);
         System.out.println("maxDepth   : " + maxDepth);
         System.out.println("Output     : " + outputPath);
         System.out.println();
 
-        //Politeness delay 1s/domain .
         CrawlConfig config = CrawlConfig.builder()
                 .maxDepth(maxDepth)
                 .maxPages(maxPages)
@@ -109,18 +108,16 @@ public class MultiDomainCrawlerRunner {
 
         List<ImageFound> images = imagesStore.all();
         ImageStorage.saveToJson(image, imagePath);
-        System.out.printf("Kho anh : %d anh tren %d trang -> %s%n".
+        System.out.printf("Image store : %d images across %d pages -> %s%n".
                             images.size(), imageStore.pageCount(), imagePath);
     }
 
-    /** Gộp 2 link */
     private static List<String> concat(List<String> a, List<String> b) {
         List<String> all = new Array<>(a);
         all.addAll(b);
         return List.copyof(all);
     }
 
-    /** Số host phân việt trong tập hạt giống - trần thông lượng do politeness. */
     private static int distinctSeedHost() {
         Set<String> hosts = new LinkedHashSet<>();
         for (String seed : DEFAULT_SEEDS) {
@@ -145,25 +142,21 @@ public class MultiDomainCrawlerRunner {
         return host;
     }
 
-    /**
-     * Số liệu của từng khối trong sơ đồ kiến trúc crawler
-     * chứng minh mỗi khối thật sự có việc làm
-     */
 
     private static void printBlockStatistics(CrawlerService crawler) {
         System.out.println();
-        System.out.println("=== THONG KE THEO TUNG KHOI ===");
+        System.out.println("=== PER-COMPONENT STATISTICS ===");
 
         DnsResolver dns = crawler.getDnsResolver();
-        System.out.printf("DNS Resolver : %d host trong cache, ty le trung %.1f%%, %d host che bi loai so,%n",
+        System.out.printf("DNS Resolver : %d hosts cached, hit rate %.1f%%, %d resolve failures%n",
                            dns.getCacheHostCount(), dns.hitRate()*100, dns.getResolveFailures());
 
         HtmlDownloader downloader = crawler.gethtmlDownloader();
-        System.out.printf("HTML Downloader : tai %d trang, %d lan thu hai, %d that bai %n",
+        System.out.printf("HTML Downloader : downloaded %d pages, %d retries, %d failures%n",
                            downloader.getDownloadedCount(), downloader.getRetryCount(), downloader.getFailedCount());
 
         LanguageFilter language = crawler.getLanguageFilter();
-        System.out.printf("Language Filter: Giu %d tieng viet + %d tieng Anh + %d chua ro , vut %d ngoai ngu%n",
+        System.out.printf("Language Filter: kept %d Vietnamese + %d English + %d undetermined, dropped %d foreign%n",
                            language.getAcceptedVietnameseCount(), language.getAcceptedEnglistCount(),
                            language.getAcceptedUndeterminedCoungt(), language.getRejectedCount());
         Map<String, Long> rejectedByLanguage = language.getRejectedByLanguage();
@@ -176,28 +169,28 @@ public class MultiDomainCrawlerRunner {
         }
 
         ContentSeenFilter contentSeen = crawler.getContentSeenFilter();
-        System.out.printf("Content Seen?  : %d noi dung phan biet, VUT %d ban trung, %d trang than bai rong%n",
+        System.out.printf("Content Seen?  : %d distinct contents, dropped %d duplicates, %d blank pages%n",
                 contentSeen.size(), contentSeen.getDuplicateCount(), contentSeen.getBlankSkippedCount());
 
         UrlFilter filter = crawler.getUrlFilter();
-        System.out.printf("URL Filter     : nhan %d, loai %d%n",
+        System.out.printf("URL Filter     : accepted %d, rejected %d%n",
                 filter.getAcceptedCount(), filter.getTotalRejectedCount());
-        System.out.printf("                 (domain %d | duoi tep %d | do sau %d | scheme %d | robots %d)%n",
+        System.out.printf("                 (domain %d | extension %d | depth %d | scheme %d | robots %d)%n",
                 filter.getRejectedByDomainCount(), filter.getRejectedByExtensionCount(),
                 filter.getRejectedByDepthCount(), filter.getRejectedBySchemeCount(),
                 filter.getRejectedByRobotsCount());
 
 
         UrlSeenFilter urlSeen = crawler.getUrlSeenFilter();
-        System.out.printf("URL Seen?      : %d URL phan biet, bo loc %d bit (%.1f KB), %d ham bam%n",
+        System.out.printf("URL Seen?      : %d distinct URLs, filter %d bits (%.1f KB), %d hash functions%n",
                 urlSeen.getSeenCount(), urlSeen.getNumBits(),
                 urlSeen.getNumBits() / 8192.0, urlSeen.getNumHashes());
 
 
         UrlStorage urlStorage = urlSeen.getUrlStorage();
         System.out.printf("URL Storage    : %s%n", urlStorage.isEnabled()
-                ? urlStorage.getWrittenCount() + " URL da ghi vao " + urlStorage.getPath()
-                : "tat (dung CrawlConfig.urlStoragePath de bat)");
+                ? urlStorage.getWrittenCount() + " URLs written to " + urlStorage.getPath()
+                : "off (set CrawlConfig.urlStoragePath to enable)");
 
 
     }
@@ -206,15 +199,15 @@ public class MultiDomainCrawlerRunner {
     private static void printStatistics(List<WebDocument> docs, long elapsedMs,
                                          String outputPath, Set<String> allowedDomains) {
         System.out.println();
-        System.out.printf("Tong so trang    : %d%n", docs.size());
-        System.out.printf("Thoi gian        : %.1f phut%n", elapsedMs / 60000.0);
-        System.out.printf("Thong luong      : %.2f trang/giay%n", docs.size() / (elapsedMs / 1000.0));
+        System.out.printf("Total pages      : %d%n", docs.size());
+        System.out.printf("Elapsed time     : %.1f minutes%n", elapsedMs / 60000.0);
+        System.out.printf("Throughput       : %.2f pages/second%n", docs.size() / (elapsedMs / 1000.0));
 
         
     }
 
     private static String hostOf(String url) {
         String host = DnsResolver.hostOf(url);
-        return host != null ? host : "khong ro";
+        return host != null ? host : "unknown";
     }
 }

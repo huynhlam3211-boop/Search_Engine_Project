@@ -29,13 +29,7 @@ function App(): JSX.Element {
 
   useEffect(() => {
     init()
-    // Khôi phục phiên đăng nhập TRƯỚC khi gửi sự kiện, để sự kiện đầu tiên
-    // cũng mang được danh tính. Máy chủ là nguồn sự thật: `restore` hỏi
-    // /api/auth/me chứ không tin token trong localStorage.
     void restoreSession().then(() => {
-      // Một phiên bắt đầu. Gửi ngay ở đây chứ không đợi lượt tìm kiếm đầu
-      // tiên: người mở ứng dụng rồi chỉ duyệt web vẫn là một người truy cập,
-      // và không đếm họ sẽ làm mọi tỉ lệ "lượt tìm trên mỗi người" bị thổi phồng.
       track({ type: 'visit' })
     })
   }, [init, restoreSession])
@@ -65,8 +59,6 @@ function App(): JSX.Element {
         <SideRail />
       </div>
 
-      {/* Hai lớp phủ toàn màn hình, tự ẩn khi chưa mở. Đặt CUỐI cây để chúng
-          nằm trên mọi thứ mà không cần đẩy z-index của các phần khác lên. */}
       <AuthScreen />
       <AdminPanel />
     </div>

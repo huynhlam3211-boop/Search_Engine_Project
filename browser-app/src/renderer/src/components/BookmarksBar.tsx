@@ -70,8 +70,8 @@ function BookmarksBar(): JSX.Element {
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted
                    transition-colors hover:bg-raised hover:text-ink focus-visible:outline-none
                    focus-visible:ring-2 focus-visible:ring-brand/60"
-        aria-label="Ứng dụng"
-        title="Ứng dụng"
+        aria-label="Apps"
+        title="Apps"
       >
         <GridAppsIcon className="h-[15px] w-[15px]" />
       </button>
@@ -81,7 +81,7 @@ function BookmarksBar(): JSX.Element {
       <div ref={trackRef} className="relative flex min-w-0 flex-1 items-center overflow-hidden">
         {nodes.length === 0 ? (
           <span className="truncate pl-1 text-[12px] text-faint">
-            Bấm ngôi sao ở ô địa chỉ để lưu trang vào đây.
+            Click the star in the address bar to save a page here.
           </span>
         ) : (
           visible.map((node) => <BookmarkChip key={node.id} node={node} />)
@@ -108,8 +108,8 @@ function BookmarksBar(): JSX.Element {
               'focus-visible:ring-brand/60 ' +
               (overflowOpen ? 'bg-raised text-ink' : '')
             }
-            aria-label={`Xem thêm ${hidden.length} dấu trang`}
-            title={`Còn ${hidden.length} dấu trang nữa`}
+            aria-label={`Show ${hidden.length} more bookmarks`}
+            title={`${hidden.length} more bookmarks`}
             aria-expanded={overflowOpen}
           >
             <ChevronsRightIcon className="h-[15px] w-[15px]" />
@@ -118,7 +118,7 @@ function BookmarksBar(): JSX.Element {
             open={overflowOpen}
             onClose={() => setOverflowOpen(false)}
             width={250}
-            label="Dấu trang khác"
+            label="Other bookmarks"
           >
             {hidden.map((node) => (
               <BookmarkRow key={node.id} node={node} onDone={() => setOverflowOpen(false)} />
@@ -137,10 +137,10 @@ function BookmarksBar(): JSX.Element {
           'focus-visible:ring-2 focus-visible:ring-brand/60 ' +
           (panelOpen === 'bookmarks' ? 'bg-raised text-ink' : '')
         }
-        title="Mở toàn bộ dấu trang"
+        title="Open all bookmarks"
       >
         <StarIcon className="h-[15px] w-[15px]" />
-        Tất cả dấu trang
+        All bookmarks
       </button>
     </div>
   )
@@ -196,7 +196,7 @@ function BookmarkChip({
         label={node.title}
       >
         {(node.children ?? []).length === 0 ? (
-          <p className="px-2.5 py-2 text-[12px] text-faint">Thư mục trống.</p>
+          <p className="px-2.5 py-2 text-[12px] text-faint">This folder is empty.</p>
         ) : (
           (node.children ?? []).map((child) => (
             <BookmarkRow key={child.id} node={child} onDone={() => setFolderOpen(false)} />

@@ -1,7 +1,7 @@
 {
   "name": "browser-app",
   "version": "1.0.0",
-  "description": "VnSearch — trình duyệt mini cho search engine VnSearch",
+  "description": "VnSearch — a mini browser for the VnSearch search engine",
   "main": "./out/main/index.js",
   "author": "VnSearch",
   "scripts": {

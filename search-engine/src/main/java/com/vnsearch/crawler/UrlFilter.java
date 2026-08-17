@@ -7,33 +7,26 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class UrlFilter {
 
-    /**Trong một phiên crawl báo điện tử, ảnh chiếm phần lớn số liên
-     * kết bóc được, nên đây là phép lọc tiết kiệm băng thông nhiều nhất. */
 
     private static final Set<String> BLOCKED_EXTENSIONS = Set.of(
-        // ảnh
         "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tif", "tiff",
-        // tài nguyên tĩnh của trang
         "css", "js", "json", "xml", "rss", "atom", "woff", "woff2", "ttf", "eot",
-        // tài liệu
         "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "csv",
-        // nén và cài đặt
         "zip", "rar", "7z", "tar", "gz", "bz2", "exe", "msi", "apk", "dmg", "iso",
-        // đa phương 
         "mp3", "mp4", "avi", "mkv", "mov", "wmv", "flv", "wav", "m4a", "webm");
 
     public static final Set<String> NON_VI_EN_HOST_PREFIXES = Set.of(
-            "cn.", "zh.",           // tieng Trung
-            "ja.", "jp.",           // tieng Nhat
-            "ko.", "kr.",           // tieng Han
-            "ru.",                  // tieng Nga
-            "fr.",                  // tieng Phap
-            "es.",                  // tieng Tay Ban Nha
-            "de.",                  // tieng Duc
-            "pt.",                  // tieng Bo Dao Nha
-            "ar.",                  // tieng A Rap
-            "th.",                  // tieng Thai
-            "lo.", "km.");          // tieng Lao, tieng Khmer
+            "cn.", "zh.",
+            "ja.", "jp.",
+            "ko.", "kr.",
+            "ru.",
+            "fr.",
+            "es.",
+            "de.",
+            "pt.",
+            "ar.",
+            "th.",
+            "lo.", "km.");
     
 
     private final Set<String> allowedDomains;
@@ -68,7 +61,7 @@ public class UrlFilter {
                       RobotsTxtParser robotsTxtParser, String userAgent) {
         
         if (maxDepth < 0){
-            throw new IllegalArgumentException("maxDepth phải >= 0, nhận được: " + maxDepth);
+            throw new IllegalArgumentException("maxDepth must be >= 0, got: " + maxDepth);
         }
         this.allowedDomains = allowedDomains == null ? Set.of() : Set.copyOf(allowedDomains);
         this.excludedHostPrefixes = excludedHostPrefixes == null ? Set.of() : Set.copyOf(excludedHostPrefixes);
@@ -78,11 +71,6 @@ public class UrlFilter {
 
     }
 
-    /**
-     * Luật lọc rẻ, <b>không chạm mạng</b>: độ sâu, giao thức, domain, đuôi tệp.
-     *
-     * @return {@code true} nếu URL xứng đáng được xếp vào hàng đợi
-     */
 
     public boolean accept(String url , int depth) {
         if (depth > maxDepth) {
@@ -127,11 +115,6 @@ public class UrlFilter {
         return true;
     }
 
-    /**
-     * Luật lọc <b>đắt</b>: hỏi {@code robots.txt} của host. Lần đầu gặp một
-     * host có thể phải tải qua mạng; các lần sau lấy từ cache của
-     * {@link RobotsTxtParser}.
-     */
 
     public boolean isAllowedByRobots(String url){
         boolean allowed = robotsTxtParser.isAllowed(userAgent, url);
@@ -155,13 +138,6 @@ public class UrlFilter {
         return false;
     }
 
-    /**
-     * Loại các subdomain ngoại ngữ — xem {@link #NON_VI_EN_HOST_PREFIXES}.
-     *
-     * <p>Khớp theo tiền tố có <b>dấu chấm</b> ({@code "en."} chứ không phải
-     * {@code "en"}) để {@code enviro.example.vn} hay {@code endorse.example.vn}
-     * không bị loại oan.
-     */
     private boolean hasExcludedHostPrefix(String host) {
         if (excludedHostPrefixes.isEmpty()) {
             return false;
@@ -175,7 +151,6 @@ public class UrlFilter {
         return false;
     }
 
-     /** Xét đuôi tệp của đoạn cuối đường dẫn; đường dẫn không có dấu chấm thì cho qua. */
     private boolean hasBlockedExtension(String path) {
         if (path == null || path.isEmpty()) {
             return false;
@@ -220,23 +195,22 @@ public class UrlFilter {
     }
 
 
-    /* Demo*/
 
     public static void main(String[] args) {
         UrlFilter filter = new UrlFilter(Set.of("vnexpress.net"), 3);
 
-        System.out.println("Bài viết hợp lệ      : " + filter.accept("https://vnexpress.net/bai-1.html", 1));
-        System.out.println("Ngoài domain cho phép: " + filter.accept("https://facebook.com/x", 1));
-        System.out.println("Ảnh (đuôi bị chặn)   : " + filter.accept("https://vnexpress.net/anh.jpg", 1));
-        System.out.println("Sâu quá maxDepth     : " + filter.accept("https://vnexpress.net/bai-2.html", 9));
-        System.out.println("Không phải http(s)   : " + filter.accept("mailto:toasoan@vnexpress.net", 1));
+        System.out.println("Valid article        : " + filter.accept("https://vnexpress.net/article-1.html", 1));
+        System.out.println("Outside allowed domain: " + filter.accept("https://facebook.com/x", 1));
+        System.out.println("Image (blocked ext)  : " + filter.accept("https://vnexpress.net/photo.jpg", 1));
+        System.out.println("Deeper than maxDepth : " + filter.accept("https://vnexpress.net/article-2.html", 9));
+        System.out.println("Not http(s)          : " + filter.accept("mailto:toasoan@vnexpress.net", 1));
 
         System.out.println();
-        System.out.println("Đã nhận       : " + filter.getAcceptedCount());
-        System.out.println("Loại vì domain: " + filter.getRejectedByDomainCount());
-        System.out.println("Loại vì đuôi  : " + filter.getRejectedByExtensionCount());
-        System.out.println("Loại vì độ sâu: " + filter.getRejectedByDepthCount());
-        System.out.println("Loại vì scheme: " + filter.getRejectedBySchemeCount());
+        System.out.println("Accepted           : " + filter.getAcceptedCount());
+        System.out.println("Rejected by domain : " + filter.getRejectedByDomainCount());
+        System.out.println("Rejected by ext    : " + filter.getRejectedByExtensionCount());
+        System.out.println("Rejected by depth  : " + filter.getRejectedByDepthCount());
+        System.out.println("Rejected by scheme : " + filter.getRejectedBySchemeCount());
     }
 
 

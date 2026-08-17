@@ -54,8 +54,6 @@ public final class UrlCanonicalizer {
         }
     }
 
-    //** input: [https://example.com/page#section](https://example.com/page#section) */
-    //** output: [https://example.com/page](https://example.com/page)*/
     public static String stripFragment(String url) {
         int hashIndex = url.indexOf('#');
         return hashIndex >= 0 ? url.substring(0, hashIndex) : url;

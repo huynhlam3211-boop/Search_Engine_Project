@@ -69,10 +69,4 @@ public class RobotsTxtParser {
         }
     }
 
-    /**
-     *  isAllowed(https://vnexpress.net/) = true
-        isAllowed(https://vnexpress.net/tin-tuc/khoa-hoc) = true
-        isAllowed(https://vnexpress.net/wp-admin/) = true
-     *  
-     */
 }

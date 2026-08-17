@@ -36,29 +36,18 @@ public class HtmlDowloader {
 
     public HtmlDownloader(DnsResolver dnsResolver, int timeoutMs, int maxRetries) {
         if (timeoutMs <= 0) {
-            throw new IllegalArgumentException("timeoutMs phải > 0, nhận được: " + timeoutMs);
+            throw new IllegalArgumentException("timeoutMs must be > 0, got: " + timeoutMs);
         }
         if (maxRetries < 0) {
-            throw new IllegalArgumentException("maxRetries phải >= 0, nhận được: " + maxRetries);
+            throw new IllegalArgumentException("maxRetries must be >= 0, got: " + maxRetries);
         }
         this.dnsResolver = dnsResolver;
         this.timeoutMs = timeoutMs;
         this.maxRetries = maxRetries;
     }
 
-    /**
-     * Tải một trang và trả về cây DOM đã được Jsoup phân tích.
-     *
-     * <p>Lưu ý phân công trách nhiệm: lớp này <b>chỉ</b> tải và phân tích cú
-     * pháp HTML. Việc rút title/body/link ra khỏi cây DOM là việc của
-     * {@link ContentParser} và {@link LinkExtractor}.
-     *
-     * @throws UnknownHostException nếu DNS không phân giải được host (không thử lại)
-     * @throws IOException          nếu đã thử hết số lần cho phép mà vẫn thất bại
-     */
     public Document download(String url) throws IOException {
 
-        // Mũi tên "HTML Dowloader -> DNS Resolver"
         dnsResolver.resolveHostOf(url);
 
         IOException lastError = null;

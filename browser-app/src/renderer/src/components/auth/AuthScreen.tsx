@@ -10,23 +10,6 @@ import {
 import PasswordField from './PasswordField'
 import { CloseIcon, ShieldCheckIcon, SpinnerIcon, UserIcon, VnSearchMark } from '../icons'
 
-/**
- * Màn hình tài khoản toàn màn hình: đăng nhập, đăng ký, đổi mật khẩu.
- *
- * VÌ SAO MỘT MÀN HÌNH RIÊNG, TRONG KHI ĐÃ CÓ BIỂU MẪU TRONG POPOVER. Popover
- * rộng 280px là chỗ tốt cho *lối vào nhanh* — gõ hai ô rồi xong. Nó là chỗ tồi
- * cho mọi thứ còn lại: đăng ký cần ba ô cộng thanh đo độ mạnh và các dòng nhắc
- * lỗi, đổi mật khẩu cần ba ô nữa, và cả hai đều cần chỗ để giải thích luật.
- * Nhồi chúng vào một popover thì hoặc là chật, hoặc là phải cắt bớt phần giải
- * thích — mà phần giải thích chính là thứ làm biểu mẫu dùng được.
- *
- * Hai lối vào cùng tồn tại có chủ ý: popover cho người đã biết mình làm gì,
- * màn hình này cho lần đầu.
- *
- * KIỂM TRA TẠI CHỖ, NHƯNG CHỈ SAU KHI RỜI Ô. Báo "tên quá ngắn" ngay từ ký tự
- * đầu tiên là mắng người dùng vì chưa gõ xong. Ở đây lỗi chỉ hiện sau khi ô đã
- * mất tiêu điểm (`touched`) hoặc sau lần bấm gửi đầu tiên.
- */
 function AuthScreen(): JSX.Element | null {
   const screen = useSessionStore((state) => state.screen)
   const close = useSessionStore((state) => state.closeScreen)
@@ -37,8 +20,6 @@ function AuthScreen(): JSX.Element | null {
     if (!screen) {
       return undefined
     }
-    // Khung nội dung web là một WebContentsView của Electron, nằm TRÊN mọi thứ
-    // React vẽ. Không giành lớp phủ thì màn hình này bị trang web che mất.
     acquire()
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
@@ -61,12 +42,12 @@ function AuthScreen(): JSX.Element | null {
       className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-chrome"
       role="dialog"
       aria-modal="true"
-      aria-label="Tài khoản VnSearch"
+      aria-label="VnSearch account"
     >
       <header className="flex h-12 shrink-0 items-center gap-2 px-4">
         <VnSearchMark className="h-5 w-5" />
         <span className="text-[13px] font-semibold text-ink">VnSearch</span>
-        <button onClick={close} className="icon-btn ml-auto" aria-label="Đóng" title="Đóng (Esc)">
+        <button onClick={close} className="icon-btn ml-auto" aria-label="Close" title="Close (Esc)">
           <CloseIcon className="h-4 w-4" strokeWidth={2.2} />
         </button>
       </header>
@@ -93,7 +74,6 @@ function fieldClass(hasError: boolean): string {
   )
 }
 
-/** Đăng nhập và đăng ký dùng chung một biểu mẫu — chỉ khác vài ô và vài chữ. */
 function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
   const signIn = useSessionStore((state) => state.signIn)
   const signUp = useSessionStore((state) => state.signUp)
@@ -109,14 +89,11 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
 
   const isSignUp = mode === 'signup'
   const usernameError = validateUsername(username)
-  // Khi ĐĂNG NHẬP không kiểm luật mật khẩu: luật có thể đã đổi kể từ lúc người
-  // này tạo tài khoản, và chặn họ đăng nhập vì mật khẩu cũ "không đạt chuẩn
-  // mới" là chặn nhầm hoàn toàn.
   const passwordError = isSignUp
     ? validatePassword(password)
     : password
       ? null
-      : 'Hãy nhập mật khẩu.'
+      : 'Please enter a password.'
   const confirmationError = isSignUp ? validateConfirmation(password, confirmation) : null
   const strength = isSignUp && password ? passwordStrength(password) : null
 
@@ -147,12 +124,12 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
           <UserIcon className="h-7 w-7" />
         </span>
         <h1 className="mt-4 text-[20px] font-semibold text-ink">
-          {isSignUp ? 'Tạo tài khoản VnSearch' : 'Đăng nhập VnSearch'}
+          {isSignUp ? 'Create a VnSearch account' : 'Sign in to VnSearch'}
         </h1>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
           {isSignUp
-            ? 'Tài khoản mới luôn có vai trò Người dùng. Chỉ quản trị viên mới nâng được vai trò.'
-            : 'Tìm kiếm không cần đăng nhập — đăng nhập chỉ mở thêm những gì cần biết bạn là ai.'}
+            ? 'A new account always gets the User role. Only an administrator can promote it.'
+            : 'Search needs no sign-in — signing in only unlocks what requires knowing who you are.'}
         </p>
       </div>
 
@@ -162,7 +139,7 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
             htmlFor="auth-username"
             className="mb-1.5 block text-[12px] font-medium text-muted"
           >
-            Tên tài khoản
+            Username
           </label>
           <input
             id="auth-username"
@@ -172,7 +149,7 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
             autoFocus
             spellCheck={false}
             autoComplete="username"
-            placeholder="vidu.nguyenvana"
+            placeholder="example.username"
             aria-invalid={show('username') && !!usernameError}
             className={fieldClass(show('username') && !!usernameError)}
           />
@@ -186,15 +163,15 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
         <div onBlur={() => setTouched((t) => ({ ...t, password: true }))}>
           <PasswordField
             id="auth-password"
-            label="Mật khẩu"
+            label="Password"
             value={password}
             onChange={setPassword}
             autoComplete={isSignUp ? 'new-password' : 'current-password'}
-            placeholder={isSignUp ? 'Ít nhất 8 ký tự' : ''}
+            placeholder={isSignUp ? 'At least 8 characters' : ''}
             error={show('password') ? passwordError : null}
             hint={
               isSignUp && !password
-                ? 'Một cụm nhiều từ dễ nhớ hơn và khó phá hơn một từ có thêm ký tự lạ.'
+                ? 'A few words strung together is easier to remember and harder to crack than one word with odd characters.'
                 : undefined
             }
           />
@@ -205,7 +182,7 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
           <div onBlur={() => setTouched((t) => ({ ...t, confirmation: true }))}>
             <PasswordField
               id="auth-confirmation"
-              label="Nhập lại mật khẩu"
+              label="Confirm password"
               value={confirmation}
               onChange={setConfirmation}
               autoComplete="new-password"
@@ -234,31 +211,24 @@ function SignInOrUpForm({ mode }: { mode: 'signin' | 'signup' }): JSX.Element {
                    disabled:text-faint focus-visible:outline-none focus-visible:ring-2
                    focus-visible:ring-brand/60"
       >
-        {busy ? <SpinnerIcon className="h-4 w-4" /> : isSignUp ? 'Tạo tài khoản' : 'Đăng nhập'}
+        {busy ? <SpinnerIcon className="h-4 w-4" /> : isSignUp ? 'Create account' : 'Sign in'}
       </button>
 
       <p className="mt-4 text-center text-[12px] text-muted">
-        {isSignUp ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'}{' '}
+        {isSignUp ? 'Already have an account?' : 'No account yet?'}{' '}
         <button
           type="button"
           onClick={() => openScreen(isSignUp ? 'signin' : 'signup')}
           className="font-medium text-brand underline-offset-2 hover:underline
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
         >
-          {isSignUp ? 'Đăng nhập' : 'Đăng ký'}
+          {isSignUp ? 'Sign in' : 'Sign up'}
         </button>
       </p>
     </form>
   )
 }
 
-/**
- * Thanh đo độ mạnh — chỉ để **gợi ý**, không chặn.
- *
- * Chặn theo thang này sẽ tái lập đúng thứ mà luật mật khẩu ở máy chủ cố tránh:
- * ép người dùng vào một khuôn dễ đoán. Và màu không phải kênh duy nhất — luôn
- * có nhãn chữ bên cạnh.
- */
 function StrengthMeter({
   strength
 }: {
@@ -286,7 +256,6 @@ function StrengthMeter({
   )
 }
 
-/** Đổi mật khẩu: ba ô, và một lời cảnh báo về hệ quả. */
 function ChangePasswordForm(): JSX.Element {
   const user = useSessionStore((state) => state.user)
   const change = useSessionStore((state) => state.changePassword)
@@ -300,7 +269,9 @@ function ChangePasswordForm(): JSX.Element {
 
   const nextError = validatePassword(next)
   const sameAsOld =
-    next && current && next === current ? 'Mật khẩu mới phải khác mật khẩu hiện tại.' : null
+    next && current && next === current
+      ? 'The new password must differ from the current one.'
+      : null
   const confirmationError = validateConfirmation(next, confirmation)
   const strength = next ? passwordStrength(next) : null
   const canSubmit =
@@ -323,38 +294,38 @@ function ChangePasswordForm(): JSX.Element {
         <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft text-brand">
           <ShieldCheckIcon className="h-7 w-7" />
         </span>
-        <h1 className="mt-4 text-[20px] font-semibold text-ink">Đổi mật khẩu</h1>
+        <h1 className="mt-4 text-[20px] font-semibold text-ink">Change password</h1>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-          Tài khoản <span className="font-medium text-ink">{user?.username}</span>. Mọi phiên đăng
-          nhập <b>khác</b> sẽ bị đóng; thiết bị này thì không.
+          Account <span className="font-medium text-ink">{user?.username}</span>. Every{' '}
+          <b>other</b> sign-in session will be closed; this device will not.
         </p>
       </div>
 
       <div className="space-y-3.5">
         <PasswordField
           id="password-current"
-          label="Mật khẩu hiện tại"
+          label="Current password"
           value={current}
           onChange={setCurrent}
           autoComplete="current-password"
           autoFocus
-          hint="Phải nhập lại dù bạn đang đăng nhập — chi tiết ở dưới."
+          hint="Required again even though you are signed in — details below."
         />
         <div>
           <PasswordField
             id="password-new"
-            label="Mật khẩu mới"
+            label="New password"
             value={next}
             onChange={setNext}
             autoComplete="new-password"
-            placeholder="Ít nhất 8 ký tự"
+            placeholder="At least 8 characters"
             error={submitted ? (nextError ?? sameAsOld) : null}
           />
           {strength && <StrengthMeter strength={strength} />}
         </div>
         <PasswordField
           id="password-confirm"
-          label="Nhập lại mật khẩu mới"
+          label="Confirm new password"
           value={confirmation}
           onChange={setConfirmation}
           autoComplete="new-password"
@@ -381,13 +352,13 @@ function ChangePasswordForm(): JSX.Element {
                    disabled:text-faint focus-visible:outline-none focus-visible:ring-2
                    focus-visible:ring-brand/60"
       >
-        {busy ? <SpinnerIcon className="h-4 w-4" /> : 'Đổi mật khẩu'}
+        {busy ? <SpinnerIcon className="h-4 w-4" /> : 'Change password'}
       </button>
 
       <p className="mt-5 rounded-xl border border-line bg-raised px-3.5 py-3 text-[11.5px] leading-relaxed text-faint">
-        <b>Vì sao vẫn phải nhập mật khẩu hiện tại?</b> Vì đây là chỗ chặn một chiếc token bị đánh
-        cắp. Không hỏi thì kẻ cầm token đổi được mật khẩu và khoá chính bạn ra ngoài — biến một
-        phiên bị lộ tạm thời thành mất tài khoản vĩnh viễn.
+        <b>Why is the current password still required?</b> Because this is where a stolen token gets
+        stopped. Without the check, whoever holds the token could change the password and lock you
+        out — turning a briefly leaked session into a permanently lost account.
       </p>
     </form>
   )

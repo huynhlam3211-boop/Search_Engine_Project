@@ -18,8 +18,8 @@ function NavigationButtons(): JSX.Element {
         onClick={() => goBack()}
         disabled={!canGoBack}
         className="icon-btn"
-        aria-label="Quay lại"
-        title="Quay lại (Alt+←)"
+        aria-label="Back"
+        title="Back (Alt+←)"
       >
         <ArrowLeftIcon className="h-[18px] w-[18px]" />
       </button>
@@ -27,17 +27,12 @@ function NavigationButtons(): JSX.Element {
         onClick={() => goForward()}
         disabled={!canGoForward}
         className="icon-btn"
-        aria-label="Tiến tới"
-        title="Tiến tới (Alt+→)"
+        aria-label="Forward"
+        title="Forward (Alt+→)"
       >
         <ArrowRightIcon className="h-[18px] w-[18px]" />
       </button>
-      <button
-        onClick={() => reload()}
-        className="icon-btn"
-        aria-label="Tải lại"
-        title="Tải lại (F5)"
-      >
+      <button onClick={() => reload()} className="icon-btn" aria-label="Reload" title="Reload (F5)">
         <ReloadIcon className="h-[18px] w-[18px]" />
       </button>
       <button
@@ -46,8 +41,8 @@ function NavigationButtons(): JSX.Element {
           navigate(HOME_URL)
         }}
         className="icon-btn"
-        aria-label="Trang chủ"
-        title="Trang chủ VnSearch"
+        aria-label="Home"
+        title="VnSearch home"
       >
         <HomeIcon className="h-[18px] w-[18px]" />
       </button>

@@ -32,26 +32,10 @@ import {
   UsersIcon
 } from '../icons'
 
-/** Chu kỳ tự làm mới. Đủ nhanh để thấy hoạt động, đủ chậm để không đốt pin. */
 const REFRESH_MS = 10_000
-
-/**
- * Bảng điều khiển quản trị — toàn màn hình, chỉ vai trò ADMIN thấy nội dung.
- *
- * BA THỨ ĐƯỢC TRÌNH BÀY, THEO ĐÚNG THỨ TỰ CÂU HỎI NGƯỜI VẬN HÀNH ĐẶT RA:
- *
- *   1. Người dùng đang làm gì   → lưu lượng, truy vấn, liên kết được bấm
- *   2. Máy tìm kiếm biết những gì → corpus đã crawl
- *   3. Ai được xem những thứ trên → bảng phân quyền
- *
- * Mục 3 không phải phần trang trí: cả tính năng này tồn tại để thể hiện ranh
- * giới quyền, nên ranh giới đó phải nhìn thấy được ngay trong sản phẩm.
- */
 function AdminPanel(): JSX.Element | null {
   const open = useAdminStore((state) => state.dashboardOpen)
   const close = useAdminStore((state) => state.closeDashboard)
-  // Bằng chứng quyền: token của một tài khoản ADMIN, hoặc khoá tĩnh. Cái nào
-  // có thì dùng cái đó — xem `useAdminCredential`.
   const credential = useAdminCredential()
   const acquire = useOverlayStore((state) => state.acquire)
   const release = useOverlayStore((state) => state.release)
@@ -60,9 +44,6 @@ function AdminPanel(): JSX.Element | null {
     if (!open) {
       return undefined
     }
-    // Khung nội dung web là một WebContentsView của Electron — nó nằm TRÊN mọi
-    // thứ React vẽ ra. Không giành lấy lớp phủ thì bảng điều khiển bị trang web
-    // đang mở che mất một nửa.
     acquire()
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
@@ -85,7 +66,7 @@ function AdminPanel(): JSX.Element | null {
       className="fixed inset-0 z-50 flex flex-col bg-surface"
       role="dialog"
       aria-modal="true"
-      aria-label="Bảng điều khiển quản trị"
+      aria-label="Admin dashboard"
     >
       {credential ? (
         <Dashboard credential={credential} onClose={close} />
@@ -96,13 +77,12 @@ function AdminPanel(): JSX.Element | null {
   )
 }
 
-/** Người chưa có quyền: một cửa xác thực, và nói rõ vì sao cửa này tồn tại. */
 function GuestView({ onClose }: { onClose: () => void }): JSX.Element {
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-4">
-        <h1 className="flex-1 text-[13px] font-semibold text-ink">Bảng điều khiển quản trị</h1>
-        <button onClick={onClose} className="icon-btn" aria-label="Đóng" title="Đóng (Esc)">
+        <h1 className="flex-1 text-[13px] font-semibold text-ink">Admin dashboard</h1>
+        <button onClick={onClose} className="icon-btn" aria-label="Close" title="Close (Esc)">
           <CloseIcon className="h-4 w-4" strokeWidth={2.2} />
         </button>
       </header>
@@ -133,7 +113,6 @@ function Dashboard({
 
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  // Lần tải đầu: `false` = không hiện con quay, vì khung xương đã nói lên điều đó.
   useEffect(() => {
     loadDashboard(credential, false)
     return clearDashboard
@@ -153,10 +132,7 @@ function Dashboard({
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
           <ShieldCheckIcon className="h-4 w-4" />
         </span>
-        <h1 className="text-[13px] font-semibold text-ink">Bảng điều khiển quản trị</h1>
-        {/* Nói rõ quyền này đến từ ĐÂU. Hai đường xác thực có hệ quả khác
-            nhau (một cái ghi được 'ai đã làm gì', cái kia không), nên người
-            đang xem cần biết mình đang đứng ở đường nào. */}
+        <h1 className="text-[13px] font-semibold text-ink">Admin dashboard</h1>
         {credential.kind === 'session' ? (
           <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-success">
             admin · {currentUser?.username}
@@ -164,14 +140,14 @@ function Dashboard({
         ) : (
           <span
             className="rounded-full bg-warn/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-warn"
-            title="Đang dùng khoá tĩnh X-API-Key: không có tài khoản nào đứng sau, nên không ghi lại được ai đã thao tác."
+            title="Using the static X-API-Key: no account stands behind it, so there is no record of who performed each action."
           >
-            admin · khoá API
+            admin · API key
           </span>
         )}
 
         <span className="ml-3 min-w-0 truncate text-[11.5px] text-faint">
-          {data ? `Cập nhật ${dateTime(data.generatedAt)}` : 'Đang tải…'}
+          {data ? `Updated ${dateTime(data.generatedAt)}` : 'Loading…'}
         </span>
 
         <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -182,13 +158,13 @@ function Dashboard({
               onChange={(event) => setAutoRefresh(event.target.checked)}
               className="accent-[var(--color-brand)]"
             />
-            Tự làm mới 10s
+            Auto-refresh 10s
           </label>
           <button
             onClick={() => loadDashboard(credential)}
             className="icon-btn"
-            aria-label="Làm mới"
-            title="Làm mới ngay"
+            aria-label="Refresh"
+            title="Refresh now"
           >
             {loading ? (
               <SpinnerIcon className="h-[17px] w-[17px]" />
@@ -199,29 +175,26 @@ function Dashboard({
           <button
             onClick={() => resetTrafficData(credential)}
             className="icon-btn hover:text-danger"
-            aria-label="Đặt lại số liệu lưu lượng"
-            title="Đặt lại số liệu lưu lượng (không đụng tới chỉ mục)"
+            aria-label="Reset traffic metrics"
+            title="Reset traffic metrics (leaves the index untouched)"
           >
             <TrashIcon className="h-[17px] w-[17px]" />
           </button>
           <button
             onClick={() => {
-              // Thoát CẢ HAI đường: bỏ khoá tĩnh trong bộ nhớ, và nếu đang
-              // đăng nhập bằng tài khoản thì đăng xuất luôn. Bỏ một đường mà
-              // giữ đường kia sẽ khiến bảng vẫn mở như chưa có gì xảy ra.
               clearKey()
               if (credential.kind === 'session') {
                 void signOutAccount()
               }
             }}
             className="icon-btn"
-            aria-label="Thoát quyền quản trị"
-            title="Thoát quyền quản trị"
+            aria-label="Exit admin mode"
+            title="Exit admin mode"
           >
             <ExitIcon className="h-[17px] w-[17px]" />
           </button>
           <div className="mx-1 h-5 w-px bg-line" />
-          <button onClick={onClose} className="icon-btn" aria-label="Đóng" title="Đóng (Esc)">
+          <button onClick={onClose} className="icon-btn" aria-label="Close" title="Close (Esc)">
             <CloseIcon className="h-4 w-4" strokeWidth={2.2} />
           </button>
         </div>
@@ -239,8 +212,6 @@ function Dashboard({
           {data === null ? (
             <LoadingSkeleton />
           ) : (
-            // Giữ nguyên bố cục khi đang tải lại, chỉ mờ đi: dựng lại khung
-            // xương mỗi 10 giây sẽ làm trang nhảy và chớp liên tục.
             <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
               <DashboardBody data={data} credential={credential} />
             </div>
@@ -270,122 +241,121 @@ function DashboardBody({
     <div className="flex flex-col gap-5">
       {traffic.truncated && (
         <p className="rounded-xl border border-line bg-raised px-3.5 py-2.5 text-[11.5px] leading-relaxed text-muted">
-          Một bảng thống kê đã chạm trần bộ nhớ, nên các bảng xếp hạng bên dưới bị thiếu phần đuôi.
-          Các con số tổng vẫn đầy đủ. Trần này là có chủ ý — xem <code>UsageAnalyticsService</code>.
+          One of the stat tables hit its memory ceiling, so the rankings below are missing their tail.
+          The totals are still complete. The ceiling is intentional — see{' '}
+          <code>UsageAnalyticsService</code>.
         </p>
       )}
 
-      {/* ---- 1. Người dùng đang làm gì ---- */}
-      <SectionTitle icon={<ChartIcon className="h-4 w-4" />} text="Lưu lượng sử dụng" />
+      <SectionTitle icon={<ChartIcon className="h-4 w-4" />} text="Usage traffic" />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatTile
-          label="Người truy cập"
+          label="Visitors"
           value={compact(traffic.visitors)}
-          hint={`${count(traffic.activeVisitors)} đang hoạt động · ${count(traffic.signedInVisitors)} đã đăng nhập`}
+          hint={`${count(traffic.activeVisitors)} active · ${count(traffic.signedInVisitors)} signed in`}
           accent={0}
         />
         <StatTile
-          label="Lượt tìm kiếm"
+          label="Searches"
           value={compact(traffic.searches)}
-          hint={`${(traffic.searches / Math.max(1, traffic.visitors)).toFixed(1)} lượt/người`}
+          hint={`${(traffic.searches / Math.max(1, traffic.visitors)).toFixed(1)} per visitor`}
           accent={1}
         />
         <StatTile
-          label="Lượt bấm liên kết"
+          label="Link clicks"
           value={compact(traffic.clicks)}
-          hint={`Tỉ lệ bấm (CTR) ${percent(traffic.clickThroughRate)}`}
+          hint={`Click-through rate (CTR) ${percent(traffic.clickThroughRate)}`}
           accent={2}
         />
         <StatTile
-          label="Độ trễ trung bình"
+          label="Average latency"
           value={millis(traffic.avgLatencyMs)}
-          hint="Do máy chủ đo, giao diện báo lại"
+          hint="Measured by the server, reported by the UI"
         />
         <StatTile
-          label="Trang đã crawl"
+          label="Pages crawled"
           value={compact(crawl.documents)}
-          hint={`${count(crawl.distinctHosts)} tên miền`}
+          hint={`${count(crawl.distinctHosts)} domains`}
         />
         <StatTile
-          label="Liên kết đã phát hiện"
+          label="Links discovered"
           value={compact(crawl.totalOutlinks)}
-          hint={`${compact(crawl.distinctLinkTargets)} đích phân biệt`}
+          hint={`${compact(crawl.distinctLinkTargets)} distinct targets`}
         />
       </div>
 
       <ChartCard
-        title="Lưu lượng 24 giờ qua"
-        subtitle="Ba chuỗi cùng đơn vị (số đếm) nên chung một trục. Rê chuột hoặc dùng phím ←/→ để đọc từng giờ."
+        title="Traffic over the last 24 hours"
+        subtitle="All three series share the same unit (counts), so they share one axis. Hover or use the ←/→ keys to read hour by hour."
       >
         <TrendChart
           labels={traffic.hourly.map((point) => point.hour)}
           series={[
-            { name: 'Phiên truy cập', values: traffic.hourly.map((point) => point.visitors) },
-            { name: 'Lượt tìm kiếm', values: traffic.hourly.map((point) => point.searches) },
-            { name: 'Lượt bấm', values: traffic.hourly.map((point) => point.clicks) }
+            { name: 'Sessions', values: traffic.hourly.map((point) => point.visitors) },
+            { name: 'Searches', values: traffic.hourly.map((point) => point.searches) },
+            { name: 'Clicks', values: traffic.hourly.map((point) => point.clicks) }
           ]}
-          emptyText="Chưa có hoạt động nào trong 24 giờ qua. Hãy thử tìm kiếm vài lượt rồi quay lại."
+          emptyText="No activity in the last 24 hours. Try running a few searches and come back."
         />
       </ChartCard>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ChartCard
-          title="Truy vấn phổ biến nhất"
-          subtitle="Đã chuẩn hoá hoa/thường và khoảng trắng trước khi gộp."
+          title="Most popular queries"
+          subtitle="Case and whitespace are normalized before grouping."
         >
           <BarList
             rows={traffic.topQueries.map((item) => ({ label: item.label, value: item.count }))}
-            emptyText="Chưa có truy vấn nào được ghi nhận."
+            emptyText="No queries recorded yet."
           />
         </ChartCard>
 
         <ChartCard
-          title="Liên kết người dùng truy cập"
-          subtitle="Kèm thứ hạng trung bình lúc được bấm — hạng càng thấp, bộ xếp hạng càng đặt đúng chỗ."
+          title="Links users visited"
+          subtitle="With the average rank at click time — the lower the rank, the better the ranker placed it."
         >
           <BarList
             rows={traffic.topLinks.map((item) => ({
               label: shortUrl(item.url),
               value: item.count,
-              sub: item.position > 0 ? `hạng TB ${item.position.toFixed(1)}` : undefined,
+              sub: item.position > 0 ? `avg rank ${item.position.toFixed(1)}` : undefined,
               title: item.url
             }))}
-            emptyText="Chưa có lượt bấm nào. Bấm vào một kết quả tìm kiếm rồi quay lại."
+            emptyText="No clicks yet. Click a search result and come back."
           />
         </ChartCard>
 
         <ChartCard
-          title="Phân bố độ trễ truy vấn"
-          subtitle="Các khoảng tăng theo cấp số nhân, vì phân bố độ trễ có đuôi rất dài — chia đều thì mọi thứ dồn vào cột đầu."
+          title="Query latency distribution"
+          subtitle="Buckets grow exponentially, because latency distributions have a very long tail — with even buckets everything piles into the first column."
         >
           <ColumnChart
             data={traffic.latency.map((bucket) => ({
               label: bucket.label,
               value: bucket.count
             }))}
-            emptyText="Chưa có phép đo độ trễ nào."
+            emptyText="No latency measurements yet."
           />
         </ChartCard>
 
         <ChartCard
-          title="Tên miền được bấm nhiều nhất"
-          subtitle="Gộp từ bảng liên kết — một tên miền thường có nhiều URL."
+          title="Most clicked domains"
+          subtitle="Rolled up from the link table — one domain usually spans many URLs."
         >
           <BarList
             rows={traffic.topHosts.map((item) => ({ label: item.label, value: item.count }))}
-            emptyText="Chưa có lượt bấm nào."
+            emptyText="No clicks yet."
           />
         </ChartCard>
       </div>
 
-      {/* ---- 2. Máy tìm kiếm biết những gì ---- */}
-      <SectionTitle icon={<DatabaseIcon className="h-4 w-4" />} text="Dữ liệu đã thu thập" />
+      <SectionTitle icon={<DatabaseIcon className="h-4 w-4" />} text="Crawled data" />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ChartCard
-          title="Trang crawl được theo ngày"
-          subtitle={`14 ngày gần nhất. Ngày không crawl vẫn hiện, để trục thời gian không nói dối.`}
+          title="Pages crawled per day"
+          subtitle={`The last 14 days. Days with no crawling are still shown, so the time axis does not lie.`}
         >
           <ColumnChart
             data={crawl.crawledPerDay.map((day) => ({
@@ -393,137 +363,131 @@ function DashboardBody({
               value: day.count
             }))}
             labelEvery={2}
-            emptyText="Corpus chưa có mốc thời gian crawl nào."
+            emptyText="The corpus has no crawl timestamps yet."
           />
         </ChartCard>
 
         <ChartCard
-          title="Ngôn ngữ của corpus"
-          subtitle="Phần trăm số trang. Phần đuôi được gộp thành “khác” thay vì cấp thêm màu."
+          title="Corpus languages"
+          subtitle="Percentage of pages. The tail is folded into “other” instead of being given more colors."
         >
-          <ShareBar
-            parts={foldTail(crawl.languages, 3)}
-            emptyText="Chưa có trang nào trong chỉ mục."
-          />
+          <ShareBar parts={foldTail(crawl.languages, 3)} emptyText="No pages in the index yet." />
         </ChartCard>
 
-        <ChartCard title="Tên miền có nhiều trang nhất trong chỉ mục">
+        <ChartCard title="Domains with the most pages in the index">
           <BarList
             rows={crawl.topHosts.map((item) => ({ label: item.label, value: item.count }))}
-            emptyText="Chưa có trang nào trong chỉ mục."
+            emptyText="No pages in the index yet."
           />
         </ChartCard>
 
-        <ChartCard title="Chỉ mục và corpus">
+        <ChartCard title="Index and corpus">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12.5px]">
-            <Fact label="Tài liệu trong chỉ mục" value={count(index.documents)} />
-            <Fact label="Số term phân biệt" value={count(index.terms)} />
-            <Fact label="Kích thước tệp chỉ mục" value={bytes(index.sizeBytes)} />
-            <Fact label="Tỉ lệ trúng cache" value={percent(index.cacheHitRate)} />
-            <Fact label="Bộ chấm điểm" value={index.scorer} />
+            <Fact label="Documents in the index" value={count(index.documents)} />
+            <Fact label="Distinct terms" value={count(index.terms)} />
+            <Fact label="Index file size" value={bytes(index.sizeBytes)} />
+            <Fact label="Cache hit rate" value={percent(index.cacheHitRate)} />
+            <Fact label="Scorer" value={index.scorer} />
             <Fact
               label="Bloom Filter"
               value={index.bloomFilterBits > 0 ? `${compact(index.bloomFilterBits)} bit` : '—'}
             />
-            <Fact label="Trang crawl cũ nhất" value={dateTime(crawl.oldestCrawledAt)} />
-            <Fact label="Trang crawl mới nhất" value={dateTime(crawl.newestCrawledAt)} />
-            <Fact label="Độ dài tài liệu trung bình" value={`${count(crawl.avgDocLength)} token`} />
-            <Fact label="Trung vị" value={`${count(crawl.medianDocLength)} token`} />
+            <Fact label="Oldest crawled page" value={dateTime(crawl.oldestCrawledAt)} />
+            <Fact label="Newest crawled page" value={dateTime(crawl.newestCrawledAt)} />
+            <Fact label="Average document length" value={`${count(crawl.avgDocLength)} tokens`} />
+            <Fact label="Median" value={`${count(crawl.medianDocLength)} tokens`} />
           </dl>
         </ChartCard>
       </div>
 
-      {/* ---- 3. Phân tích rút ra từ số liệu ---- */}
-      <SectionTitle icon={<ChartIcon className="h-4 w-4" />} text="Phân tích" />
+      <SectionTitle icon={<ChartIcon className="h-4 w-4" />} text="Analysis" />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Độ đa dạng truy vấn"
+          label="Query diversity"
           value={percent(diversity, 0)}
-          hint="Entropy Shannon chuẩn hoá trên bảng top. 0% = mọi người tìm cùng một thứ, 100% = tản mát đều."
+          hint="Normalized Shannon entropy over the top table. 0% = everyone searches for the same thing, 100% = evenly spread."
         />
         <StatTile
-          label="Tập trung ở top 3"
+          label="Top 3 concentration"
           value={percent(concentration, 0)}
-          hint="Phần lưu lượng do 3 truy vấn lớn nhất chiếm. Đầu càng nặng, cache LRU càng hiệu quả."
+          hint="Share of traffic taken by the three largest queries. The heavier the head, the more effective the LRU cache."
         />
         <StatTile
-          label="Truy vấn không kết quả"
+          label="Zero-result queries"
           value={percent(traffic.zeroResultRate, 0)}
-          hint={`${count(traffic.zeroResultSearches)} lượt. Cao = chỉ mục thiếu, không phải người dùng gõ sai.`}
+          hint={`${count(traffic.zeroResultSearches)} searches. High means the index is missing content, not that users mistyped.`}
         />
         <StatTile
-          label="Phiên trung bình"
-          value={`${traffic.avgSessionMinutes.toFixed(1)} phút`}
-          hint="Từ sự kiện đầu tới sự kiện cuối của cùng một phiên."
+          label="Average session"
+          value={`${traffic.avgSessionMinutes.toFixed(1)} min`}
+          hint="From the first to the last event of the same session."
         />
         <StatTile
-          label="Độ phủ crawl"
+          label="Crawl coverage"
           value={percent(coverage, 1)}
-          hint="Số trang đã tải / số đích liên kết đã nhìn thấy. Thấp là bình thường khi maxPages có hạn."
+          hint="Pages fetched / link targets seen. A low value is normal when maxPages is capped."
         />
         <StatTile
-          label="Trang nút cụt"
+          label="Dangling pages"
           value={percent(danglingShare, 1)}
-          hint={`${count(crawl.danglingDocuments)} trang không có liên kết ra. PageRank phải xử lý riêng nhóm này.`}
+          hint={`${count(crawl.danglingDocuments)} pages with no outgoing links. PageRank has to handle this group separately.`}
         />
         <StatTile
-          label="Liên kết trung bình mỗi trang"
+          label="Average links per page"
           value={crawl.avgOutlinks.toFixed(1)}
-          hint="Bậc ra trung bình của đồ thị web đã thu thập."
+          hint="Average out-degree of the crawled web graph."
         />
         <StatTile
-          label="Lượt bấm mỗi lượt tìm"
+          label="Clicks per search"
           value={traffic.clickThroughRate.toFixed(2)}
-          hint="Dưới 1 là bình thường: nhiều truy vấn kết thúc mà không ai bấm gì."
+          hint="Below 1 is normal: many queries end without anyone clicking anything."
         />
       </div>
 
-      {/* ---- 4. Tài khoản ---- */}
-      <SectionTitle icon={<UsersIcon className="h-4 w-4" />} text="Tài khoản" />
+      <SectionTitle icon={<UsersIcon className="h-4 w-4" />} text="Accounts" />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Tổng tài khoản" value={count(accounts.total)} />
+        <StatTile label="Total accounts" value={count(accounts.total)} />
         <StatTile
-          label="Quản trị viên"
+          label="Administrators"
           value={count(accounts.admins)}
           hint={
             accounts.admins === 0
-              ? 'Chưa có tài khoản ADMIN nào — hiện chỉ vào được bằng khoá API.'
+              ? 'No ADMIN account yet — right now the only way in is the API key.'
               : undefined
           }
         />
         <StatTile
-          label="Phiên đăng nhập đang mở"
+          label="Open sign-in sessions"
           value={count(accounts.activeSessions)}
-          hint="Token còn hiệu lực. Khác với số phiên theo dõi số liệu ở trên."
+          hint="Tokens that are still valid. Different from the analytics sessions above."
         />
         <StatTile
-          label="Tài khoản bị vô hiệu hoá"
+          label="Disabled accounts"
           value={count(accounts.disabled)}
-          hint="Bị khoá nhưng dữ liệu vẫn giữ nguyên."
+          hint="Locked out, but their data is kept intact."
         />
       </div>
 
       <ChartCard
-        title="Danh sách tài khoản"
-        subtitle="Vai trò đọc trực tiếp từ máy chủ. Đây là câu trả lời cho “tài khoản nào là admin, tài khoản nào là người dùng thường”."
+        title="Account list"
+        subtitle="Roles are read straight from the server. This answers “which accounts are admins and which are regular users”."
       >
         <AccountsTable credential={credential} />
       </ChartCard>
 
       <ChartCard
-        title="Tài khoản tìm kiếm nhiều nhất"
-        subtitle="Chỉ tên và số lượt — cố ý KHÔNG kèm truy vấn của từng người. Bảng này trả lời “ai dùng nhiều”, không trả lời “người này tìm gì”."
+        title="Accounts that search the most"
+        subtitle="Names and counts only — individual queries are deliberately NOT included. This table answers “who uses it a lot”, not “what did this person search for”."
       >
         <BarList
           rows={traffic.topUsers.map((item) => ({ label: item.label, value: item.count }))}
-          emptyText="Chưa có lượt tìm nào từ người dùng đã đăng nhập. Người dùng ẩn danh không được quy về tài khoản nào."
+          emptyText="No searches from signed-in users yet. Anonymous users are not attributed to any account."
         />
       </ChartCard>
 
-      {/* ---- 5. Ranh giới quyền ---- */}
-      <SectionTitle icon={<ShieldCheckIcon className="h-4 w-4" />} text="Phân quyền truy cập" />
+      <SectionTitle icon={<ShieldCheckIcon className="h-4 w-4" />} text="Access permissions" />
       <div className="rounded-2xl border border-line bg-surface p-4">
         <PermissionMatrix />
       </div>

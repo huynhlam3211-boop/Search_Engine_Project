@@ -10,10 +10,10 @@ public class BloomFilter {
 
     public BloomFilter(int expectedItems, double falsePositiveRate) {
         if (expectedItems <= 0) {
-            throw new IllegalArgumentException("expectedItems phải > 0");
+            throw new IllegalArgumentException("expectedItems must be > 0");
         }
         if (falsePositiveRate <= 0 || falsePositiveRate >= 1) {
-            throw new IllegalArgumentException("falsePositiveRate phải trong khoảng (0, 1)");
+            throw new IllegalArgumentException("falsePositiveRate must be in the range (0, 1)");
         }
         double ln2 = Math.log(2);
         int m = (int) Math.ceil(-expectedItems * Math.log(falsePositiveRate) / (ln2 * ln2));
@@ -129,6 +129,6 @@ public class BloomFilter {
 
         System.out.println("mightContain(vnexpress) = " + filter.mightContain("https://vnexpress.net/"));
         System.out.println("mightContain(tuoitre)   = " + filter.mightContain("https://tuoitre.vn/"));
-        System.out.println("mightContain(chưa thêm) = " + filter.mightContain("https://khong-ton-tai.vn/"));
+        System.out.println("mightContain(not added) = " + filter.mightContain("https://not-exists.vn/"));
     }
 }

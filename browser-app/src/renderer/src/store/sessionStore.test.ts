@@ -1,15 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AuthError, type AccountDto } from '../lib/authApi'
 
-/**
- * Phiên đăng nhập phía giao diện.
- *
- * Ba điều được chốt ở đây, và cả ba đều là chỗ dễ làm sai:
- *   1. đăng nhập hỏng thì KHÔNG được giữ lại token nào;
- *   2. `restore()` tin MÁY CHỦ, không tin token trong localStorage;
- *   3. mất mạng lúc khởi động thì KHÔNG được xoá token — phiên có thể vẫn còn.
- */
-
 const api = vi.hoisted(() => ({
   login: vi.fn(),
   logout: vi.fn(),
@@ -26,8 +17,8 @@ vi.mock('../lib/authToken', () => token)
 
 const { useSessionStore } = await import('./sessionStore')
 
-const NGUOI_DUNG: AccountDto = {
-  username: 'nguoidung',
+const USER: AccountDto = {
+  username: 'regularuser',
   role: 'USER',
   enabled: true,
   createdAt: '2026-08-10T10:00:00Z',
@@ -40,76 +31,75 @@ describe('sessionStore', () => {
     useSessionStore.setState({ user: null, ready: false, busy: false, error: null })
   })
 
-  it('đăng nhập thành công thì lưu token và người dùng', async () => {
+  it('stores the token and the user after a successful sign-in', async () => {
     api.login.mockResolvedValue({
-      token: 'token-moi',
+      token: 'new-token',
       expiresAt: '2026-08-10T22:00:00Z',
-      user: NGUOI_DUNG
+      user: USER
     })
 
-    const ok = await useSessionStore.getState().signIn('nguoidung', 'matkhaudaidu')
+    const ok = await useSessionStore.getState().signIn('regularuser', 'alongpassword')
 
     expect(ok).toBe(true)
-    expect(token.setAuthToken).toHaveBeenCalledWith('token-moi')
-    expect(useSessionStore.getState().user).toEqual(NGUOI_DUNG)
+    expect(token.setAuthToken).toHaveBeenCalledWith('new-token')
+    expect(useSessionStore.getState().user).toEqual(USER)
     expect(useSessionStore.getState().error).toBeNull()
   })
 
-  it('đăng nhập hỏng thì xoá sạch token và giữ thông báo của máy chủ', async () => {
-    api.login.mockRejectedValue(new AuthError('Tên tài khoản hoặc mật khẩu không đúng.'))
+  it('clears the token and keeps the server message when sign-in fails', async () => {
+    api.login.mockRejectedValue(new AuthError('Incorrect username or password.'))
 
-    const ok = await useSessionStore.getState().signIn('nguoidung', 'sai')
+    const ok = await useSessionStore.getState().signIn('regularuser', 'wrong')
 
     expect(ok).toBe(false)
     expect(token.setAuthToken).toHaveBeenCalledWith(null)
     expect(useSessionStore.getState().user).toBeNull()
-    expect(useSessionStore.getState().error).toBe('Tên tài khoản hoặc mật khẩu không đúng.')
+    expect(useSessionStore.getState().error).toBe('Incorrect username or password.')
   })
 
-  /** Lỗi mạng phải nói khác lỗi từ chối, nếu không người dùng sửa nhầm chỗ. */
-  it('lỗi mạng thì báo là lỗi kết nối, không phải sai mật khẩu', async () => {
+  it('reports a connection problem, not a wrong password, on a network error', async () => {
     api.login.mockRejectedValue(new TypeError('Failed to fetch'))
 
-    await useSessionStore.getState().signIn('nguoidung', 'matkhaudaidu')
+    await useSessionStore.getState().signIn('regularuser', 'alongpassword')
 
-    expect(useSessionStore.getState().error).toContain('Không kết nối được')
+    expect(useSessionStore.getState().error).toContain('Cannot reach the server')
   })
 
-  it('đăng ký xong thì đăng nhập luôn, không bắt gõ lại', async () => {
-    api.register.mockResolvedValue(NGUOI_DUNG)
+  it('signs in right after registering instead of asking for the details again', async () => {
+    api.register.mockResolvedValue(USER)
     api.login.mockResolvedValue({
-      token: 'token-moi',
+      token: 'new-token',
       expiresAt: '2026-08-10T22:00:00Z',
-      user: NGUOI_DUNG
+      user: USER
     })
 
-    const ok = await useSessionStore.getState().signUp('nguoidung', 'matkhaudaidu')
+    const ok = await useSessionStore.getState().signUp('regularuser', 'alongpassword')
 
     expect(ok).toBe(true)
-    expect(api.login).toHaveBeenCalledWith('nguoidung', 'matkhaudaidu')
-    expect(useSessionStore.getState().user).toEqual(NGUOI_DUNG)
+    expect(api.login).toHaveBeenCalledWith('regularuser', 'alongpassword')
+    expect(useSessionStore.getState().user).toEqual(USER)
   })
 
-  it('đăng ký hỏng thì KHÔNG thử đăng nhập', async () => {
-    api.register.mockRejectedValue(new AuthError('Tên tài khoản đã tồn tại: nguoidung'))
+  it('does NOT attempt a sign-in when registration fails', async () => {
+    api.register.mockRejectedValue(new AuthError('Username already exists: regularuser'))
 
-    const ok = await useSessionStore.getState().signUp('nguoidung', 'matkhaudaidu')
+    const ok = await useSessionStore.getState().signUp('regularuser', 'alongpassword')
 
     expect(ok).toBe(false)
     expect(api.login).not.toHaveBeenCalled()
-    expect(useSessionStore.getState().error).toContain('đã tồn tại')
+    expect(useSessionStore.getState().error).toContain('already exists')
   })
 
-  it('khôi phục phiên theo lời MÁY CHỦ', async () => {
-    api.me.mockResolvedValue(NGUOI_DUNG)
+  it('restores the session according to the SERVER', async () => {
+    api.me.mockResolvedValue(USER)
 
     await useSessionStore.getState().restore()
 
-    expect(useSessionStore.getState().user).toEqual(NGUOI_DUNG)
+    expect(useSessionStore.getState().user).toEqual(USER)
     expect(useSessionStore.getState().ready).toBe(true)
   })
 
-  it('máy chủ nói token không còn hiệu lực thì dọn token đi', async () => {
+  it('drops the token when the server says it is no longer valid', async () => {
     api.me.mockResolvedValue(null)
 
     await useSessionStore.getState().restore()
@@ -119,11 +109,7 @@ describe('sessionStore', () => {
     expect(useSessionStore.getState().ready).toBe(true)
   })
 
-  /**
-   * Backend đang khởi động lại KHÔNG phải lý do để đăng xuất người dùng: phiên
-   * có thể vẫn còn hiệu lực, và xoá token ở đây bắt họ đăng nhập lại vô cớ.
-   */
-  it('mất kết nối lúc khởi động thì KHÔNG xoá token', async () => {
+  it('does NOT clear the token when the connection drops during startup', async () => {
     api.me.mockRejectedValue(new TypeError('Failed to fetch'))
 
     await useSessionStore.getState().restore()
@@ -132,8 +118,8 @@ describe('sessionStore', () => {
     expect(useSessionStore.getState().ready).toBe(true)
   })
 
-  it('đăng xuất thì báo máy chủ rồi xoá trạng thái tại máy', async () => {
-    useSessionStore.setState({ user: NGUOI_DUNG })
+  it('tells the server on sign-out, then clears the local state', async () => {
+    useSessionStore.setState({ user: USER })
     api.logout.mockResolvedValue(undefined)
 
     await useSessionStore.getState().signOut()

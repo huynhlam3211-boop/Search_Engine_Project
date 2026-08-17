@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Stack } from './Stack'
 
-/**
- * `Stack` là cấu trúc đỡ lịch sử duyệt web (nút Lùi / Tiến), nên hai tính chất
- * đáng kiểm nhất là thứ tự LIFO và hành vi khi rỗng — chỗ mà một lỗi sẽ hiện ra
- * dưới dạng "bấm Lùi thì ứng dụng đứng hình".
- */
 describe('Stack', () => {
-  it('lấy ra theo thứ tự ngược với lúc đẩy vào (LIFO)', () => {
+  it('pops in the reverse order of pushes (LIFO)', () => {
     const stack = new Stack<string>()
     stack.push('a')
     stack.push('b')
@@ -18,7 +13,7 @@ describe('Stack', () => {
     expect(stack.pop()).toBe('a')
   })
 
-  it('trả về undefined thay vì ném lỗi khi rỗng', () => {
+  it('returns undefined instead of throwing when empty', () => {
     const stack = new Stack<number>()
     expect(stack.pop()).toBeUndefined()
     expect(stack.peek()).toBeUndefined()
@@ -26,17 +21,17 @@ describe('Stack', () => {
     expect(stack.size()).toBe(0)
   })
 
-  it('peek xem được đỉnh mà KHÔNG lấy ra', () => {
+  it('peek reads the top WITHOUT removing it', () => {
     const stack = new Stack<number>()
     stack.push(1)
     stack.push(2)
 
     expect(stack.peek()).toBe(2)
-    expect(stack.size()).toBe(2) // vẫn còn nguyên hai phần tử
-    expect(stack.peek()).toBe(2) // gọi lại vẫn ra đúng cái đó
+    expect(stack.size()).toBe(2)
+    expect(stack.peek()).toBe(2)
   })
 
-  it('clear đưa về rỗng', () => {
+  it('clear empties the stack', () => {
     const stack = new Stack<number>()
     stack.push(1)
     stack.push(2)
@@ -46,10 +41,7 @@ describe('Stack', () => {
     expect(stack.toArray()).toEqual([])
   })
 
-  it('toArray trả về BẢN SAO, không phải mảng nội bộ', () => {
-    // Nếu trả thẳng mảng nội bộ thì bên gọi sửa được ruột của stack — đúng
-    // loại lỗi mà `InvertedIndex.getAllDocuments()` ở backend chặn bằng
-    // `unmodifiableMap`.
+  it('toArray returns a COPY, not the internal array', () => {
     const stack = new Stack<number>()
     stack.push(1)
 
@@ -60,12 +52,12 @@ describe('Stack', () => {
     expect(stack.toArray()).toEqual([1])
   })
 
-  it('giữ đúng thứ tự đáy → đỉnh trong toArray', () => {
+  it('keeps bottom to top order in toArray', () => {
     const stack = new Stack<string>()
-    stack.push('day')
-    stack.push('giua')
-    stack.push('dinh')
+    stack.push('bottom')
+    stack.push('middle')
+    stack.push('top')
 
-    expect(stack.toArray()).toEqual(['day', 'giua', 'dinh'])
+    expect(stack.toArray()).toEqual(['bottom', 'middle', 'top'])
   })
 })

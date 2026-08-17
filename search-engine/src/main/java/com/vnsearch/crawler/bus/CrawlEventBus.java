@@ -10,10 +10,10 @@ public interface CrawlEventBus {
 
     static CrawlEventVus noop() {
         return new CrawlEventBus() {
-            @Override public void publishPage(PageEvent event) { /* vứt */ }
-            @Override public void publishDiscoveredUrl(DiscoveredUrl url) { /* vứt */ }
-            @Override public void publishOutlinks(OutlinksExtracted outlinks) { /* vứt */ }
-            @Override public void publishImage(ImageFound image) { /* vứt */ }
+            @Override public void publishPage(PageEvent event) { }
+            @Override public void publishDiscoveredUrl(DiscoveredUrl url) { }
+            @Override public void publishOutlinks(OutlinksExtracted outlinks) { }
+            @Override public void publishImage(ImageFound image) { }
             @Override public long getPublishFailureCount() { return 0L; }
         }
     }

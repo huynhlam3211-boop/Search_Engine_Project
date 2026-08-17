@@ -1,8 +1,3 @@
-/**
- * Máy chủ VnSearch. Xuất ra ngoài để `telemetry.ts` và `adminApi.ts` dùng
- * CHUNG một địa chỉ — ba bản sao của cùng một chuỗi là ba chỗ phải nhớ sửa khi
- * đổi cổng, và chỗ bị quên sẽ hỏng lặng lẽ.
- */
 export const API_BASE = 'http://localhost:8080'
 const REQUEST_TIMEOUT_MS = 8000
 
@@ -70,10 +65,6 @@ export async function search(query: string, page = 1, pageSize = 10): Promise<Se
     results,
     totalResults: raw.totalResults ?? results.length,
     page: raw.page ?? page,
-    // Máy chủ trả về `pageSize` ĐÃ ÁP DỤNG, có thể khác giá trị vừa gửi lên:
-    // một `size` ngoài khoảng 1..100 bị thay bằng mặc định 20. Vì vậy giá trị
-    // của máy chủ mới là giá trị đúng, và `?? pageSize` chỉ còn là lối lùi cho
-    // máy chủ đời cũ chưa có trường này.
     pageSize: raw.pageSize ?? pageSize,
     timeTakenMs: raw.timeTakenMs ?? 0,
     droppedTerms: raw.droppedTerms ?? []
@@ -86,7 +77,6 @@ export interface ImageResultDto {
   pageTitle: string
   host: string
   altText: string
-  /** Chiều rộng KHAI BÁO trong HTML, `-1` khi trang không khai báo. */
   width: number
   height: number
   missingAlt: boolean
@@ -97,31 +87,8 @@ export interface ImageResponseDto {
   results: ImageResultDto[]
   page: number
   pageSize: number
-  /** TỔNG số ảnh khớp truy vấn — không phải số ảnh trong lô này. */
   totalResults: number
-  /**
-   * Còn lô nữa không.
-   *
-   * Do máy chủ tính, KHÔNG suy từ `results.length === pageSize`. Cách suy đó
-   * sai đúng ở ca biên hay gặp nhất: khi tổng số ảnh chia hết cho pageSize,
-   * lô cuối đầy đủ nên giao diện tưởng còn nữa, gọi thêm một lần rồi nhận về
-   * rỗng — người dùng thấy vòng quay chạy vô ích ở cuối trang.
-   */
   hasMore: boolean
-  /**
-   * Số trang đã xét để lấy ảnh.
-   *
-   * Cần cho giao diện phân biệt HAI ca mà nếu chỉ nhìn `results` rỗng thì
-   * trông giống hệt nhau:
-   *
-   *   pagesScanned === 0  → truy vấn không khớp trang nào
-   *   pagesScanned > 0    → có trang khớp, nhưng chưa trang nào được
-   *                         Image Download Service xử lý
-   *
-   * Ca thứ hai cần một thông báo hoàn toàn khác: "hãy chạy crawl", chứ không
-   * phải "không tìm thấy" — nói sai chỗ này khiến người dùng đi sửa truy vấn
-   * trong khi vấn đề nằm ở chỗ chưa có dữ liệu.
-   */
   pagesScanned: number
   timeTakenMs: number
 }
@@ -147,7 +114,6 @@ export async function searchImages(query: string, page = 1, size = 30): Promise<
   })
   const results = (raw.results ?? [])
     .map(normalizeImage)
-    // Bỏ mục không có địa chỉ ảnh: chúng chỉ tạo ra một ô vỡ trong lưới.
     .filter((image) => image.imageUrl !== '')
 
   return {

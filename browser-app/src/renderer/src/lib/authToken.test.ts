@@ -1,14 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-/**
- * Kho token phiên.
- *
- * Module này giữ một bản sao trong bộ nhớ, nên mỗi bài phải nạp lại module —
- * `vi.resetModules()` + `import()` động. Dùng `import` tĩnh ở đầu tệp thì bài
- * thứ hai sẽ thấy bản sao mà bài thứ nhất để lại, và cả tệp trở nên phụ thuộc
- * thứ tự chạy.
- */
-
 interface FakeStorage {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
@@ -33,8 +24,6 @@ function fakeStorage(initial: Record<string, string> = {}): FakeStorage {
 async function loadModule(storage: FakeStorage | null): Promise<typeof import('./authToken')> {
   vi.resetModules()
   if (storage) {
-    // Môi trường test chạy trên Node nên không có `window`. Dựng vừa đủ phần
-    // mà module thật sự chạm tới.
     ;(globalThis as { window?: unknown }).window = { localStorage: storage }
   } else {
     delete (globalThis as { window?: unknown }).window
@@ -47,31 +36,31 @@ describe('authToken', () => {
     delete (globalThis as { window?: unknown }).window
   })
 
-  it('chưa có token thì header rỗng, không phải header hỏng', async () => {
+  it('with no token yet the header is empty, not a broken header', async () => {
     const { getAuthToken, authHeader } = await loadModule(fakeStorage())
 
     expect(getAuthToken()).toBeNull()
     expect(authHeader()).toEqual({})
   })
 
-  it('đọc lại token đã lưu từ lần chạy trước', async () => {
-    const { getAuthToken } = await loadModule(fakeStorage({ 'vnsearch-session-token': 'token-cu' }))
+  it('reads back a token stored by a previous run', async () => {
+    const { getAuthToken } = await loadModule(fakeStorage({ 'vnsearch-session-token': 'old-token' }))
 
-    expect(getAuthToken()).toBe('token-cu')
+    expect(getAuthToken()).toBe('old-token')
   })
 
-  it('ghi token thì cả bộ nhớ lẫn đĩa cùng đổi', async () => {
+  it('writing a token updates both memory and disk', async () => {
     const storage = fakeStorage()
     const { setAuthToken, getAuthToken } = await loadModule(storage)
 
-    setAuthToken('token-moi')
+    setAuthToken('new-token')
 
-    expect(getAuthToken()).toBe('token-moi')
-    expect(storage.data['vnsearch-session-token']).toBe('token-moi')
+    expect(getAuthToken()).toBe('new-token')
+    expect(storage.data['vnsearch-session-token']).toBe('new-token')
   })
 
-  it('đặt null thì xoá khỏi đĩa — không để lại chuỗi "null"', async () => {
-    const storage = fakeStorage({ 'vnsearch-session-token': 'token-cu' })
+  it('setting null clears it from disk — leaving no "null" string behind', async () => {
+    const storage = fakeStorage({ 'vnsearch-session-token': 'old-token' })
     const { setAuthToken, getAuthToken } = await loadModule(storage)
 
     setAuthToken(null)
@@ -80,7 +69,7 @@ describe('authToken', () => {
     expect('vnsearch-session-token' in storage.data).toBe(false)
   })
 
-  it('sinh đúng header Bearer', async () => {
+  it('produces the correct Bearer header', async () => {
     const { setAuthToken, authHeader } = await loadModule(fakeStorage())
 
     setAuthToken('abc123')
@@ -88,15 +77,11 @@ describe('authToken', () => {
     expect(authHeader()).toEqual({ Authorization: 'Bearer abc123' })
   })
 
-  /**
-   * Không có `localStorage` (môi trường bị hạn chế) thì phải chạy tiếp, không
-   * được ném: mất khả năng nhớ phiên là phiền, còn làm sập giao diện là hỏng.
-   */
-  it('thiếu localStorage cũng không ném', async () => {
+  it('does not throw when localStorage is missing', async () => {
     const { getAuthToken, setAuthToken, authHeader } = await loadModule(null)
 
     expect(() => setAuthToken('abc')).not.toThrow()
-    expect(getAuthToken()).toBe('abc') // vẫn giữ trong bộ nhớ của phiên này
+    expect(getAuthToken()).toBe('abc') 
     expect(authHeader()).toEqual({ Authorization: 'Bearer abc' })
   })
 })

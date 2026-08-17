@@ -147,9 +147,9 @@ function AddressBar(): JSX.Element {
             setHighlighted(-1)
           }}
           className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-faint focus:outline-none"
-          placeholder="Tìm kiếm hoặc nhập địa chỉ web"
+          placeholder="Search or type a web address"
           spellCheck={false}
-          aria-label="Ô địa chỉ và tìm kiếm"
+          aria-label="Address and search bar"
         />
 
         {inputValue && (
@@ -162,8 +162,8 @@ function AddressBar(): JSX.Element {
             }}
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-faint
                        transition hover:bg-line hover:text-ink"
-            aria-label="Xoá nội dung"
-            title="Xoá"
+            aria-label="Clear input"
+            title="Clear"
           >
             <CloseIcon className="h-3 w-3" strokeWidth={2.2} />
           </button>
@@ -179,8 +179,8 @@ function AddressBar(): JSX.Element {
         }}
         disabled={!displayedUrl}
         className={'icon-btn ' + (bookmarked ? 'text-amber-500 hover:text-amber-500' : '')}
-        aria-label="Đánh dấu trang"
-        title={bookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu trang (Ctrl+D)'}
+        aria-label="Bookmark this page"
+        title={bookmarked ? 'Remove bookmark' : 'Bookmark this page (Ctrl+D)'}
       >
         <StarIcon className="h-[18px] w-[18px]" filled={bookmarked} />
       </button>

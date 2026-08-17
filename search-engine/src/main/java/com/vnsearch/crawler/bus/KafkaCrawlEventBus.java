@@ -23,7 +23,7 @@ public class KafkaCrawlEventBus implement CrawlEventBus {
     public KafkaCrawlEventBus(KafkaTemplate<String, Object> template, String pagesTopic,
                                String urlsTopic, String outlinksTopic, String imagesTopic) {
         if (template == null) {
-            throw new IllegalArgumentException("KafkaCrawlEventBus cần một KafkaTemplate");
+            throw new IllegalArgumentException("KafkaCrawlEventBus requires a KafkaTemplate");
         }
         this.template = template;
         this.pagesTopic = require(pagesTopic, "pagesTopic");
@@ -34,7 +34,7 @@ public class KafkaCrawlEventBus implement CrawlEventBus {
 
     private static String require(String value, String name) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Thiếu tên topic: " + name);
+            throw new IllegalArgumentException("Missing topic name: " + name);
         }
         return value;
     }
@@ -73,28 +73,18 @@ public class KafkaCrawlEventBus implement CrawlEventBus {
         send(imagesTopic, image.host(), image, image.imageUrl());
     }
 
-    /**
-     * Gửi một thông điệp, đếm lỗi ở callback.
-     *
-     * <p>{@code try/catch} bọc cả lời gọi {@code send} vì nó <i>vẫn</i> ném
-     * đồng bộ trong vài ca: thông điệp vượt {@code max.request.size} (một
-     * trang HTML dị thường), hoặc bộ đệm producer đầy và hết thời gian chờ.
-     * Chỉ dựa vào callback là bỏ sót đúng những ca đó.
-     *
-     * @param subject thứ để ghi vào log — URL, không phải cả thông điệp
-     */
     private void send(String topic, String key, Object payload, String subject) {
         try {
             template.send(topic, key, payload).whenComplete((result, error) -> {
                 if (error != null) {
                     publishFailures.incrementAndGet();
-                    log.warn("Không gửi được lên topic {} (khoá {}), đối tượng {}: {}",
+                    log.warn("Failed to publish to topic {} (key {}), payload {}: {}",
                             topic, key, subject, error.toString());
                 }
             });
         } catch (Exception e) {
             publishFailures.incrementAndGet();
-            log.warn("Không gửi được lên topic {} (khoá {}), đối tượng {}: {}",
+            log.warn("Failed to publish to topic {} (key {}), payload {}: {}",
                     topic, key, subject, e.toString());
         }
     }

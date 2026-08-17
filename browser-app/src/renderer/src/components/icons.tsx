@@ -472,7 +472,6 @@ export function VnSearchMark({ className }: { className?: string }): JSX.Element
   )
 }
 
-/** Khiên — biểu tượng của khu vực quản trị, dùng chung ở thanh bên và bảng điều khiển. */
 export function ShieldIcon(props: IconProps): JSX.Element {
   return (
     <Icon {...props}>
@@ -481,7 +480,6 @@ export function ShieldIcon(props: IconProps): JSX.Element {
   )
 }
 
-/** Khiên có dấu tick — đã xác thực, vai trò ADMIN đang hoạt động. */
 export function ShieldCheckIcon(props: IconProps): JSX.Element {
   return (
     <Icon {...props}>
@@ -538,7 +536,6 @@ export function ChartIcon(props: IconProps): JSX.Element {
   )
 }
 
-/** Hình người — dùng cho avatar khi CHƯA đăng nhập. */
 export function UserIcon(props: IconProps): JSX.Element {
   return (
     <Icon {...props}>

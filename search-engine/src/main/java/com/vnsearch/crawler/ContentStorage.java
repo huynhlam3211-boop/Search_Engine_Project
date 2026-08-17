@@ -17,5 +17,30 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ContentStorage {
 
+    private final ConcurrentHashMap<String, WebDocument> byUrl = new ConcurrentHashMap<>();
+
+    public boolean save(WebDocument doc) {
+
+    }
+
+    public boolean applyOutlinks(String url, List<String> outlinks) {
+
+    }
+
+    public int size() {
+
+    }
+
+    public List<WebDocument> all() {
+
+    }
+
+    public static void saveToJson(List<WebDocument> documents, String path) throws IOException {
+
+    }
+
+    public static List<WebDocument> loadFromJson(String path) throws IOException {
+        
+    }
     
  }

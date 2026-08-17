@@ -1,18 +1,6 @@
 import { useState, type JSX } from 'react'
 import { EyeIcon, EyeOffIcon } from '../icons'
 
-/**
- * Ô mật khẩu có nút hiện/ẩn.
- *
- * VÌ SAO CÓ NÚT HIỆN. Ô mật khẩu che ký tự để chống người đứng sau lưng nhìn
- * trộm — nhưng cái giá là người gõ cũng không tự kiểm tra được mình vừa gõ gì.
- * Trên bàn phím lạ hoặc với một mật khẩu dài, đó là nguyên nhân số một của
- * "đăng nhập sai mà không hiểu vì sao". Nút hiện trả lại quyền quyết định cho
- * người dùng: họ biết lúc nào quanh mình an toàn, giao diện thì không.
- *
- * MẶC ĐỊNH LUÔN LÀ ẨN, và trạng thái hiện KHÔNG được nhớ giữa các lần mở — một
- * ô mật khẩu tự động hiện ở lần sau là một cái bẫy.
- */
 function PasswordField({
   id,
   label,
@@ -64,17 +52,12 @@ function PasswordField({
         <button
           type="button"
           onClick={() => setVisible((shown) => !shown)}
-          // KHÔNG đặt tabIndex={-1}. Bản đầu có, với lý do "đỡ chen một nút phụ
-          // vào giữa ô mật khẩu và nút gửi" — đánh đổi đó SAI: nó khiến người
-          // chỉ dùng bàn phím không cách nào bật được chế độ hiện mật khẩu, tức
-          // là mất hẳn một chức năng chứ không phải chậm hơn một nhịp. Tiết
-          // kiệm một lần nhấn Tab không đáng đổi lấy điều đó.
           className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center
                      justify-center rounded-lg text-faint transition hover:bg-raised
                      hover:text-ink focus-visible:outline-none focus-visible:ring-2
                      focus-visible:ring-brand/50"
-          aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-          title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          aria-label={visible ? 'Hide password' : 'Show password'}
+          title={visible ? 'Hide password' : 'Show password'}
         >
           {visible ? (
             <EyeOffIcon className="h-[17px] w-[17px]" />

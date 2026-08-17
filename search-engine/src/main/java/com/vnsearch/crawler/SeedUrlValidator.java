@@ -10,5 +10,7 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class SeedUrlValidator{
+    private static final Logger log = LoggerFactory.getLogger(SeedUrlValidator.class);
+
     
 }

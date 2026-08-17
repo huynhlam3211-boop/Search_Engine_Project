@@ -39,7 +39,7 @@ public class CrawlJobManager {
         private synchronized void transitionTo(CrawlStatus next) {
             if (!status.canTransitionTo(next)) {
                 throw new IllegalStateException(
-                        "Không thể chuyển trạng thái " + status + " -> " + next);
+                        "Cannot transition from state " + status + " -> " + next);
             }
             status = next;
         }
@@ -56,7 +56,7 @@ public class CrawlJobManager {
         executor.submit(() -> {
             try {
                 job.transitionTo(CrawlStatus.RUNNING);
-                CrawlConfig config = CrawlConfig.builder() // Builder
+                CrawlConfig config = CrawlConfig.builder()
                         .maxDepth(maxDepth)
                         .maxPages(maxPages)
                         .threadCount(4)
@@ -67,7 +67,7 @@ public class CrawlJobManager {
                 job.transitionTo(CrawlStatus.DONE);
 
             } catch (Exception e) {
-                log.error("Job crawl {} fail", jobId, e);
+                log.error("Crawl job {} failed", jobId, e);
                 job.errorMessage = e.getMessage();
                 try {
                     job.transitionTo(CrawlStatus.FAILED);

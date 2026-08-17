@@ -13,11 +13,11 @@ import { hostOf, siteGradient, siteInitial } from '../lib/site'
 import { CloseIcon, DownloadIcon, PinIcon, SparkleIcon } from './icons'
 
 const TITLES: Record<PanelKind, string> = {
-  'add-site': 'Thêm trang web vào thanh bên',
-  ai: 'Hỏi AI',
-  downloads: 'Tải xuống',
-  bookmarks: 'Tất cả dấu trang',
-  app: 'Ứng dụng'
+  'add-site': 'Add a site to the side rail',
+  ai: 'Ask AI',
+  downloads: 'Downloads',
+  bookmarks: 'All bookmarks',
+  app: 'Apps'
 }
 
 function SidePanel(): JSX.Element | null {
@@ -43,13 +43,15 @@ function SidePanel(): JSX.Element | null {
         <button
           onClick={() => setPinned(!pinned)}
           className={'icon-btn ' + (pinned ? 'bg-brand-soft text-brand hover:text-brand' : '')}
-          aria-label={pinned ? 'Bỏ ghim bảng' : 'Ghim bảng'}
-          title={pinned ? 'Bỏ ghim — bảng sẽ tự đóng khi mở liên kết' : 'Ghim — giữ bảng luôn mở'}
+          aria-label={pinned ? 'Unpin panel' : 'Pin panel'}
+          title={
+            pinned ? 'Unpin — the panel closes when a link opens' : 'Pin — keep the panel open'
+          }
           aria-pressed={pinned}
         >
           <PinIcon className="h-[17px] w-[17px]" filled={pinned} />
         </button>
-        <button onClick={closePanel} className="icon-btn" aria-label="Đóng bảng" title="Đóng">
+        <button onClick={closePanel} className="icon-btn" aria-label="Close panel" title="Close">
           <CloseIcon className="h-[15px] w-[15px]" strokeWidth={2.2} />
         </button>
       </header>
@@ -91,9 +93,9 @@ function AddSiteBody(): JSX.Element {
           className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-omni px-3 text-[13px]
                      text-ink placeholder:text-faint transition
                      focus:border-brand/50 focus:outline-none focus:ring-2 focus:ring-brand/15"
-          placeholder="Nhập vào URL"
+          placeholder="Enter a URL"
           spellCheck={false}
-          aria-label="Địa chỉ trang web cần thêm"
+          aria-label="Address of the site to add"
         />
         <button
           type="submit"
@@ -103,7 +105,7 @@ function AddSiteBody(): JSX.Element {
                      disabled:cursor-not-allowed disabled:bg-raised disabled:text-faint
                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
         >
-          Thêm
+          Add
         </button>
       </form>
 
@@ -123,7 +125,7 @@ function AddSiteBody(): JSX.Element {
                   className="flex flex-col items-center gap-2 rounded-xl p-2 transition
                              enabled:hover:bg-raised disabled:opacity-45
                              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
-                  title={added ? `${app.name} đã có trên thanh bên` : `Thêm ${app.name}`}
+                  title={added ? `${app.name} is already on the side rail` : `Add ${app.name}`}
                 >
                   <AppTile app={app} size={44} />
                   <span className="w-full truncate text-center text-[11px] text-muted">
@@ -148,7 +150,7 @@ function AppBody(): JSX.Element {
 
   const item = items.find((i) => i.id === activeItemId)
   if (!item) {
-    return <EmptyState text="Ô này không còn trên thanh bên." />
+    return <EmptyState text="This tile is no longer on the side rail." />
   }
 
   const app = item.url ? undefined : findApp(item.id)
@@ -184,7 +186,7 @@ function AppBody(): JSX.Element {
                    transition hover:brightness-110 focus-visible:outline-none
                    focus-visible:ring-2 focus-visible:ring-brand/60"
       >
-        Mở trong thẻ mới
+        Open in a new tab
       </button>
     </div>
   )
@@ -217,19 +219,19 @@ function BookmarksBody(): JSX.Element {
         className="h-9 w-full rounded-lg border border-line bg-omni px-3 text-[13px] text-ink
                    placeholder:text-faint transition focus:border-brand/50 focus:outline-none
                    focus:ring-2 focus:ring-brand/15"
-        placeholder="Lọc theo tiền tố tiêu đề…"
+        placeholder="Filter by title prefix…"
         spellCheck={false}
-        aria-label="Lọc dấu trang"
+        aria-label="Filter bookmarks"
       />
 
       {all.length === 0 ? (
         <EmptyState
-          text="Chưa có dấu trang nào."
-          hint="Bấm ngôi sao ở cuối ô địa chỉ (hoặc Ctrl+D) để lưu trang đang xem."
+          text="No bookmarks yet."
+          hint="Click the star at the end of the address bar (or Ctrl+D) to save the current page."
         />
       ) : shown.length === 0 ? (
         <p className="px-1 py-8 text-center text-[12px] text-faint">
-          Không có dấu trang nào bắt đầu bằng “{filter.trim()}”.
+          No bookmark starts with “{filter.trim()}”.
         </p>
       ) : (
         <ul className="mt-2">
@@ -263,8 +265,8 @@ function BookmarksBody(): JSX.Element {
                 className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-full text-faint
                            transition hover:bg-danger/15 hover:text-danger focus-visible:outline-none
                            group-hover:flex"
-                aria-label={`Xoá dấu trang ${bookmark.title}`}
-                title="Xoá dấu trang"
+                aria-label={`Delete bookmark ${bookmark.title}`}
+                title="Delete bookmark"
               >
                 <CloseIcon className="h-3 w-3" strokeWidth={2.2} />
               </button>
@@ -280,8 +282,8 @@ function DownloadsBody(): JSX.Element {
   return (
     <EmptyState
       icon={<DownloadIcon className="h-7 w-7" />}
-      text="Chưa có tệp nào được tải xuống."
-      hint="Các tệp bạn tải về sẽ hiện ở đây."
+      text="No files downloaded yet."
+      hint="Files you download will show up here."
     />
   )
 }
@@ -290,8 +292,8 @@ function AskAiBody(): JSX.Element {
   return (
     <EmptyState
       icon={<SparkleIcon className="h-7 w-7" />}
-      text="Chưa nối với mô hình ngôn ngữ nào."
-      hint="Khung này dành sẵn cho phần hỏi đáp; hiện VnSearch chỉ chạy tìm kiếm theo từ khoá."
+      text="Not connected to any language model."
+      hint="This panel is reserved for question answering; for now VnSearch only does keyword search."
     />
   )
 }

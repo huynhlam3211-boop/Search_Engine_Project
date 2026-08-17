@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildEventBody, readSessionId, type SessionStore } from './telemetry'
 
-/** Kho lưu giả — đủ cho `readSessionId`, không cần cả `localStorage`. */
 function fakeStore(
   initial: Record<string, string> = {}
 ): SessionStore & { data: Record<string, string> } {
@@ -16,55 +15,55 @@ function fakeStore(
 }
 
 describe('readSessionId', () => {
-  it('sinh mã mới và ghi lại ở lần gọi đầu', () => {
+  it('generates a new id and stores it on the first call', () => {
     const store = fakeStore()
 
-    const id = readSessionId(store, () => 'ma-moi')
+    const id = readSessionId(store, () => 'new-id')
 
-    expect(id).toBe('ma-moi')
-    expect(store.getItem('vnsearch-session-id')).toBe('ma-moi')
+    expect(id).toBe('new-id')
+    expect(store.getItem('vnsearch-session-id')).toBe('new-id')
   })
 
-  it('dùng lại mã đã lưu — nếu không thì mỗi lần mở app là một "người" mới', () => {
-    const store = fakeStore({ 'vnsearch-session-id': 'ma-cu' })
+  it('reuses the stored id — otherwise every app launch would look like a new "person"', () => {
+    const store = fakeStore({ 'vnsearch-session-id': 'old-id' })
     let generated = 0
 
     const id = readSessionId(store, () => {
       generated++
-      return 'khong-duoc-dung'
+      return 'must-not-be-used'
     })
 
-    expect(id).toBe('ma-cu')
+    expect(id).toBe('old-id')
     expect(generated).toBe(0)
   })
 })
 
 describe('buildEventBody', () => {
-  it('sự kiện mở ứng dụng chỉ mang mã phiên', () => {
+  it('the app-open event carries only the session id', () => {
     expect(buildEventBody({ type: 'visit' }, 'p1')).toEqual({ type: 'visit', sessionId: 'p1' })
   })
 
-  it('sự kiện tìm kiếm mang đủ truy vấn, số kết quả và độ trễ', () => {
+  it('the search event carries the query, result count and latency', () => {
     const body = buildEventBody(
-      { type: 'search', query: 'hà nội', resultCount: 12, tookMs: 18.6 },
+      { type: 'search', query: 'hanoi', resultCount: 12, tookMs: 18.6 },
       'p1'
     )
 
     expect(body).toEqual({
       type: 'search',
       sessionId: 'p1',
-      query: 'hà nội',
+      query: 'hanoi',
       resultCount: 12,
       tookMs: 19
     })
   })
 
-  it('không bao giờ gửi độ trễ âm', () => {
+  it('never sends a negative latency', () => {
     const body = buildEventBody({ type: 'search', query: 'a', resultCount: 0, tookMs: -5 }, 'p1')
     expect(body.tookMs).toBe(0)
   })
 
-  it('cắt truy vấn quá dài ngay tại phía gửi', () => {
+  it('truncates an over-long query on the sending side', () => {
     const body = buildEventBody(
       { type: 'search', query: 'x'.repeat(500), resultCount: 1, tookMs: 1 },
       'p1'
@@ -72,7 +71,7 @@ describe('buildEventBody', () => {
     expect(String(body.query)).toHaveLength(200)
   })
 
-  it('cắt URL quá dài', () => {
+  it('truncates an over-long URL', () => {
     const body = buildEventBody(
       { type: 'click', url: `https://a.vn/${'x'.repeat(900)}`, position: 3 },
       'p1'
@@ -80,7 +79,7 @@ describe('buildEventBody', () => {
     expect(String(body.url)).toHaveLength(500)
   })
 
-  it('sự kiện bấm giữ nguyên thứ hạng — con số đo chất lượng xếp hạng', () => {
+  it('the click event keeps the rank untouched — it measures ranking quality', () => {
     expect(buildEventBody({ type: 'click', url: 'https://a.vn/1', position: 21 }, 'p1')).toEqual({
       type: 'click',
       sessionId: 'p1',

@@ -24,14 +24,13 @@ public class UrlStorage implement Closeale {
         this.path = path;
     }
 
-    /** Chế độ tắt — không lưu gì, không đụng đĩa. */
     public static UrlStorage disabled(){
         return new UrlStorage(null);
     }
 
     public static UrlStorage file(Path path) {
         if (path == null){
-            throw new IllegalArgumentException("path không được null; dùng disabled() nếu muốn tắt")
+            throw new IllegalArgumentException("path must not be null; use disabled() to turn storage off")
         }
         return UrlStorage(path);
     }
@@ -67,7 +66,7 @@ public class UrlStorage implement Closeale {
                 writer.newLine();
                 written++;
             } catch (IOException e) {
-                log.warn("Không ghi được URL vào {}: {}", path, e.getMessage());
+                log.warn("Failed to write URL to {}: {}", path, e.getMessage());
             }
         }
     }

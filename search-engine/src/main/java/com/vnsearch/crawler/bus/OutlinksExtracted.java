@@ -8,7 +8,7 @@ public record OutlinksExtracted(String sourceUrl, String host, List<String> outl
     
     public OutlinksExtracted {
         if (sourceUrl == null || sourceUrl.isBlank()) {
-            throw new IllegalArgumentException("OutlinksExtracted.sourceUrl không được rỗng");
+            throw new IllegalArgumentException("OutlinksExtracted.sourceUrl must not be empty");
         }
         outlinks = outlinks == null ? List.of() : List.copyOf(outlinks);
     }

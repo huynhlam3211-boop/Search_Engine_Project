@@ -4,13 +4,13 @@ public record CrawlTask(String url, String host, int depth) {
 
     public CrawlTask {
         if (url == null || url.isBlank()) {
-            throw new IllegalArgumentException("url không được rỗng");
+            throw new IllegalArgumentException("url must not be empty");
         }
         if (host == null || host.isBlank()) {
-            throw new IllegalArgumentException("host không được rỗng");
+            throw new IllegalArgumentException("host must not be empty");
         }
         if (depth < 0) {
-            throw new IllegalArgumentException("depth phải >= 0, nhận được: " + depth);
+            throw new IllegalArgumentException("depth must be >= 0, got: " + depth);
         }
     }
 

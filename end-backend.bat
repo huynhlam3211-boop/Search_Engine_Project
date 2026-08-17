@@ -1,27 +1,5 @@
 @echo off
-rem KHONG viet tieng Viet co dau trong file .bat: cmd.exe phan tich file theo
-rem byte offset, ky tu da byte lam lech con tro doc va cat vun cac dong lenh
-rem phia sau. Ly do day du xem trong run-crawl.bat.
 setlocal
-
-rem ===========================================================================
-rem Tat toan bo he thong VnSearch va TRA LAI RAM.
-rem
-rem   end-backend.bat                 ha container + tat Docker Desktop  <-- mac dinh
-rem   end-backend.bat --keep-docker   chi ha container, de Docker Desktop chay
-rem   end-backend.bat --stop          chi dung container, KHONG xoa - bat lai nhanh
-rem   end-backend.bat --wipe          ha container VA XOA volume - MAT DU LIEU
-rem   end-backend.bat --wsl           tat luon may ao WSL2 sau khi tat Docker
-rem   end-backend.bat --help          in phan huong dan nay
-rem
-rem Bat lai: run-backend.bat
-rem
-rem VI SAO PHAI TAT DOCKER DESKTOP chu khong chi ha container. Tren Windows,
-rem Docker Engine chay trong mot may ao WSL2. May ao do GIU nguyen phan RAM da
-rem xin ke ca khi khong con container nao - thuong 1-2 GB. Ha container xong ma
-rem de Docker Desktop chay tiep thi nhin Task Manager van thay vmmemWSL an RAM
-rem va khong hieu vi sao.
-rem ===========================================================================
 
 set "ROOT=%~dp0"
 set "ENV_FILE=%ROOT%.env"
@@ -40,8 +18,6 @@ if /i "%~1"=="--keep-docker" (
     set "KEEP_DOCKER=1"
 ) else if /i "%~1"=="--stop" (
     set "STOP_ONLY=1"
-    rem `stop` giu container lai de bat lai cho nhanh - de dung roi tat may ao
-    rem ben duoi thi mau thuan, nen che do nay khong dong Docker Desktop.
     set "KEEP_DOCKER=1"
 ) else if /i "%~1"=="--wipe" (
     set "WIPE=1"
@@ -70,8 +46,6 @@ if not exist "docker-compose.yml" (
 echo.
 echo === TAT VNSEARCH ===
 
-rem RAM trong truoc khi don. In ra de thay ro viec nay co tac dung that, chu
-rem khong phai chay mot lenh roi tin.
 set "RAM_BEFORE="
 for /f "delims=" %%m in ('powershell -NoProfile -Command "[math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB,2)"') do set "RAM_BEFORE=%%m"
 if defined RAM_BEFORE echo RAM trong luc bat dau: %RAM_BEFORE% GB
@@ -82,22 +56,12 @@ if errorlevel 1 (
     goto :fail
 )
 
-rem Engine khong chay thi khong con container nao song. Nhay thang xuong phan
-rem dong Docker Desktop: giao dien co the van mo va van giu may ao.
 docker info >nul 2>nul
 if errorlevel 1 (
     echo Docker engine khong chay - khong co container nao dang song.
     goto :shutdown_desktop
 )
 
-rem ===========================================================================
-rem KHOA QUAN TRI - can ca khi TAT
-rem ===========================================================================
-rem docker-compose.yml khai bao ADMIN_API_KEY voi cu phap `${...:?}`. Compose
-rem noi suy bien cho MOI lenh, ke ca `down`, nen thieu khoa la `down` cung hong
-rem - dung luc can no nhat. Doc lai tu .env; that su khong co thi dat mot gia
-rem tri tam: `down` chi can DINH DANH container theo ten du an, khong dung toi
-rem gia tri nay.
 if defined ADMIN_API_KEY goto :key_ok
 if not exist "%ENV_FILE%" goto :key_placeholder
 for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
@@ -108,12 +72,6 @@ if defined ADMIN_API_KEY goto :key_ok
 set "ADMIN_API_KEY=khoa-tam-chi-de-compose-doc-duoc-file"
 :key_ok
 
-rem ===========================================================================
-rem HA CONTAINER
-rem ===========================================================================
-rem Luon truyen CA HAI profile. Khong truyen thi compose chi nhin thay cac dich
-rem vu mac dinh, va kafka/grafana/prometheus... o lai chay tiep - dung nhung
-rem thu an nhieu RAM nhat.
 set "PROFILES=--profile kafka --profile monitoring"
 
 if defined STOP_ONLY (
@@ -129,10 +87,6 @@ if defined STOP_ONLY (
 if defined WIPE goto :wipe
 goto :plain_down
 
-rem Phan xac nhan nay PHAI nam ngoai mot khoi ngoac don. cmd noi suy `%CONFIRM%`
-rem luc PHAN TICH ca khoi, tuc truoc khi `set /p` kip chay - viet trong ngoac
-rem thi phep so sanh luon nhin thay chuoi rong va cau hoi xac nhan thanh vo
-rem nghia. Dung nhan va goto de moi dong duoc phan tich ngay truoc khi chay.
 :wipe
 echo.
 echo [CANH BAO] --wipe se XOA cac volume:
@@ -159,8 +113,6 @@ goto :leftovers
 :plain_down
 echo.
 echo Dang ha container...
-rem --remove-orphans: don ca nhung container con sot tu mot phien ban
-rem docker-compose.yml cu, thu ma `down` tran bo lai va khong ai nhin thay.
 docker compose %PROFILES% down --remove-orphans
 if errorlevel 1 goto :compose_failed
 
@@ -168,11 +120,6 @@ if errorlevel 1 goto :compose_failed
 echo Da ha xong. Volume du lieu van con - bat lai la co ngay corpus cu.
 
 :leftovers
-rem --- Con gi giu cong 8080 khong ---
-rem Cac ban run-backend.bat truoc day chay Spring Boot bang Maven TREN MAY THAT.
-rem Mot tien trinh java nhu vay khong thuoc quyen cua docker compose: `down`
-rem khong dong toi no, no van an vai GB heap, va lan sau `up` se bao
-rem "port is already allocated" ma khong ro tai ai.
 set "PORT_PID="
 for /f "tokens=5" %%p in ('netstat -ano -p TCP ^| findstr /r /c:":8080 .*LISTENING"') do set "PORT_PID=%%p"
 if defined PORT_PID (
@@ -207,9 +154,6 @@ if not exist "%DOCKER_DESKTOP%" (
 
 echo.
 echo Dang dong Docker Desktop de tra lai RAM cua may ao...
-rem `-Shutdown` la duong dong CHINH THUC: no dung engine, dong cac distro WSL
-rem cua Docker roi mo thoat. `taskkill` chi giet cua so - engine va may ao o
-rem lai, va lan bat sau Docker hay bao hong trang thai.
 start "" "%DOCKER_DESKTOP%" -Shutdown
 
 set /a DD_WAIT=0
@@ -231,14 +175,11 @@ echo Docker Desktop da dong sau %DD_WAIT%s.
 if defined KILL_WSL (
     echo.
     echo Dang tat may ao WSL2...
-    rem Luu y: `wsl --shutdown` tat MOI distro WSL, khong rieng cua Docker. Neu
-    rem dang mo Ubuntu lam viec khac thi phien do cung mat.
     wsl --shutdown
     echo Da tat WSL2.
 )
 
 :report
-rem Do lai sau khi don. Windows tra RAM ve khong tuc thi nen cho mot nhip.
 ping -n 4 127.0.0.1 >nul
 set "RAM_AFTER="
 for /f "delims=" %%m in ('powershell -NoProfile -Command "[math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB,2)"') do set "RAM_AFTER=%%m"

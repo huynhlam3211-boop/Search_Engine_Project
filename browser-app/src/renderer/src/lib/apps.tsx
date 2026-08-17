@@ -153,7 +153,7 @@ const ZALO: SideApp = {
 
 const GAME: SideApp = {
   id: 'game',
-  name: 'Trò chơi',
+  name: 'Games',
   url: 'https://coccoc.com/games',
   color: '#7C3AED',
   glyph: gameGlyph
@@ -177,7 +177,7 @@ const FACEBOOK: SideApp = {
 
 const GOOGLE_TRANSLATE: SideApp = {
   id: 'gtranslate',
-  name: 'Google Dịch',
+  name: 'Google Translate',
   url: 'https://translate.google.com/',
   color: '#4285F4',
   glyph: translateGlyph
@@ -235,8 +235,8 @@ const SNAPCHAT: SideApp = {
 export const RAIL_APPS: SideApp[] = [MESSENGER, ZALO, GAME, YOUTUBE, FACEBOOK, GOOGLE_TRANSLATE]
 
 export const APP_GROUPS: { label: string; apps: SideApp[] }[] = [
-  { label: 'Trò chuyện', apps: [ZALO, MESSENGER, TELEGRAM, WHATSAPP] },
-  { label: 'Giải trí', apps: [CHATGPT, GEMINI, DISCORD, SNAPCHAT] }
+  { label: 'Chat', apps: [ZALO, MESSENGER, TELEGRAM, WHATSAPP] },
+  { label: 'Entertainment', apps: [CHATGPT, GEMINI, DISCORD, SNAPCHAT] }
 ]
 
 export function findApp(id: string): SideApp | undefined {

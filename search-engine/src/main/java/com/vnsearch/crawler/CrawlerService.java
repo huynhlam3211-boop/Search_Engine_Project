@@ -114,7 +114,6 @@ public class CrawlerService {
         return this;
     }
 
-    // Chạy crawl
     public List<WebDocument> crawl(List<String> seedUrls, CrawlConfig config) {
         long start = System.currentTimeMillis();
 
@@ -125,7 +124,7 @@ public class CrawlerService {
         try {
             long replayed = urlSeenFilter.replayFromStorage();
             if (replayed > 0) {
-                log.info(" {} URL từ {} ",
+                log.info("Replayed {} URLs from {}",
                         replayed, config.urlStoragePath());
             }
 
@@ -145,12 +144,11 @@ public class CrawlerService {
 
     }
 
-    // Nạp seed vào frontier
     private void seed(List<String> seedUrls) {
         for (String seed: seedUrls) {
             String url = UrlCanonicalizer.canonicalize(seed);
             if (!urlFilter.accept(url,0)) {
-                log.warn("Seed bị loại: {}", seed);
+                log.warn("Seed rejected: {}", seed);
                 continue;
             }
             urlSeenFilter.markSeenIFNew(url);
@@ -242,7 +240,6 @@ public class CrawlerService {
     public LanguageFilter getLanguageFilter() {
 
     }
-    // -- Modular Service
 
     public CrawlEventBus getEventBus() {
 
