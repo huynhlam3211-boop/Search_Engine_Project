@@ -3,38 +3,41 @@ package com.vnsearch.crawler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConsoleCrawlListener implements CrawlListener {
+public final class ConsoleCrawlListener implements CrawlListener {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleCrawlListener.class);
 
-    private final int logEveryNPages;
+    private final int everyN;
 
-    public ConsoleCrawlListener(int logEveryNPages) {
-        this.logEveryNPages = logEveryNPages <= 0 ? 1 : logEveryNPages;
+    public ConsoleCrawlListener(int everyN) {
+        this.everyN = Math.max(1, everyN);
     }
 
     @Override
-    public void onPageCrawled(CrawlEvent e){
-        if (e.pageNumber() % logEveryNPages != 0) {
+    public void onPageCrawled(CrawlEvent e) {
+        if (e.pageNumber() % everyN != 0 && e.pageNumber() != e.maxPages()) {
             return;
         }
-        log.info("[{}/{}] depth={} outlinks={} frontier={} domains={} {}",
-                e.pageNumber(), e.maxPages(), e.depth(), e.outlinks(),
-                e.frontierSize(), e.domainCount(), e.url());
+        log.info("[{}/{}] {} (depth={}, {} links, frontier={}, domains={})",
+                e.pageNumber(), e.maxPages(), e.url(), e.depth(),
+                e.outlinks(), e.frontierSize(), e.domainCount());
     }
 
     @Override
-    public void onError(String url, Exception error){
-        log.warn("Failed to crawl {}: {}", url, error.getMessage());
+    public void onError(String url, Exception error) {
+        log.warn("Khong the fetch {}: {}", url, error.getMessage());
     }
 
     @Override
-    public void onDuplicateContent(String url){
-        log.debug("Duplicate content, skipping: {}", url);
+    public void onDuplicateContent(String url) {
+        log.debug("Trung noi dung, bo qua: {}", url);
     }
 
     @Override
-    public void onFinished(int totalPages, long elapsedMs){
-        log.info("Crawl finished: {} pages in {} ms", totalPages, elapsedMs);
+    public void onFinished(int totalPages, long elapsedMs) {
+        double seconds = elapsedMs / 1000.0;
+        log.info("Ket thuc crawl: {} trang trong {} giay ({} trang/giay)",
+                totalPages, String.format("%.1f", seconds),
+                String.format("%.2f", seconds > 0 ? totalPages / seconds : 0.0));
     }
 }
