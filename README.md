@@ -9,7 +9,7 @@ MinHeap, and a Vietnamese word segmenter.
 
 ```
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   Crawler    │───▶│    Index     │───▶│   Ranking    │───▶│   REST API   │
+│   Crawler    │───▶│    Index     │───▶│   Ranking   │───▶│   REST API  │
 │              │    │              │    │              │    │              │
 │ UrlFrontier  │    │ InvertedIndex│    │ TF-IDF/BM25  │    │ /api/search  │
 │ BloomFilter  │    │ VByte + delta│    │ PageRank     │    │ /api/suggest │
@@ -17,10 +17,10 @@ MinHeap, and a Vietnamese word segmenter.
 └──────────────┘    └──────────────┘    └──────────────┘    └──────┬───────┘
                                                                     │
                                                             ┌───────▼───────┐
-                        ┌──────────────────┐                │  browser-app  │
-                        │ football-service │───────────────▶│  (Electron)   │
-                        │   (Go, :8090)    │  Sports panel  └───────────────┘
-                        └──────────────────┘
+                                                            │  browser-app  │
+                                                            │  (Electron)   │
+                                                            └───────────────┘
+
 ```
 
 ---
@@ -226,108 +226,6 @@ Four independent layers, each blocking something different:
 
 ---
 
-## Development
-
-```bash
-cd search-engine && ./mvnw clean verify   # 640 tests + coverage gate + static analysis
-cd browser-app  && npm run typecheck && npm run lint && npm test   # 128 tests
-```
-
-`verify` (not `test`) is what CI runs — it is the only phase that executes the
-coverage and static-analysis gates.
-
-### CI/CD
-
-Five workflows, all in [`.github/workflows/`](.github/workflows/):
-
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `ci.yml` | push to `main`, every PR | Tests, JaCoCo coverage gate, SpotBugs, frontend typecheck/lint/**Vitest**, Docker build, Trivy image scan, **Kafka integration tests**, **infrastructure validation** |
-| `cd.yml` | after CI passes on `main`; manual | Build + sign image, deploy to staging automatically and to production behind an approval, `--dry-run=server` first, automatic rollback if the rollout fails |
-| `codeql.yml` | push, PR, weekly | CodeQL SAST for Java and TypeScript |
-| `release.yml` | tag `v*.*.*` | Multi-arch image to GHCR with SBOM + provenance, cosign keyless signature, blocking CRITICAL CVE scan, GitHub Release |
-| `pr-title.yml` | PR opened/edited | Enforces Conventional Commits in the PR title |
-
-The `infrastructure` job validates what YAML normally only reveals at deploy
-time: `kustomize build` across all four layers, `kubeconform -strict` against
-the real Kubernetes schema, `promtool check rules` (a bad PromQL expression
-makes Prometheus refuse to load the **entire** rule file — losing every alert,
-silently), `amtool check-config`, `docker compose config` at all three profile
-levels, and a diff that stops the Compose and Kubernetes alert rules from
-drifting apart.
-
-Four quality gates block a merge, each catching a different kind of breakage:
-
-```
-640 tests           → per-unit logic errors
-JaCoCo coverage     → new code with no tests          (line ≥ 68%, branch ≥ 65%)
-SpotBugs            → bugs no test path reaches       (0 findings)
-Ranking quality     → search got worse, tests stayed green
-```
-
-The frontend has three gates of its own — `typecheck`, `lint` and **128 Vitest
-cases**. The last one is the only one that checks *behaviour*: it pins down the
-main-process navigation policy, which is a security boundary (`file://` and
-`javascript:` must be refused — see `src/main/urlPolicy.ts`).
-
-The last one is search-specific: the other three can all be green while results
-returned to users have degraded. See `RankingQualityTest`.
-
-Dependency updates are automated via [`dependabot.yml`](.github/dependabot.yml)
-for Maven, npm, and GitHub Actions.
-
-### Configuration
-
-Every environment variable is documented in [`.env.example`](.env.example). Only
-`ADMIN_API_KEY` is required; everything else has a sensible default.
-
-Switch the scoring model to BM25 (higher MRR — see
-[`docs/EVALUATION.md`](docs/EVALUATION.md)):
-
-```bash
-APP_RANKING_SCORER=bm25
-```
-
----
-
-## Documentation
-
-Documentation is written in Vietnamese.
-
-| File | Contents |
-|---|---|
-Docs are organised by **the question they answer**, not by source folder:
-
-> **New here? Start with [`docs/README.md`](docs/README.md)** — a roadmap that
-> picks a reading order for you (run it / understand it / study the algorithms
-> / operate it), plus a "want to change X, read Y" lookup table. The docs are
-> written in Vietnamese; this README is the English entry point.
-
-| Document | Answers |
-|---|---|
-| [**`docs/README.md`**](docs/README.md) | **Documentation roadmap — which of the 69 files to read, in what order** |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How do the pieces fit into one working system? |
-| [`docs/BACKEND.md`](docs/BACKEND.md) | How is the Spring Boot app assembled — beans, config, request lifecycle? |
-| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Every config key, its default, and what breaks if you change it |
-| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Where does it run, and who watches it? Docker, Kubernetes, monitoring |
-| [`docs/DEVOPS.md`](docs/DEVOPS.md) | How does code get from a laptop to a cluster? CI/CD, the seven gates |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | What is it defended against, and **what is still open**? |
-| [**`docs/ACCOUNTS-AND-DASHBOARD.md`**](docs/ACCOUNTS-AND-DASHBOARD.md) | **Accounts, roles and the admin dashboard — who may see what, and six real bugs the tests missed** |
-| [`docs/FRONTEND.md`](docs/FRONTEND.md) | The mini browser (Electron + React) |
-| [`football-service/README.md`](football-service/README.md) | The football microservice — why a 100-calls/day quota decides every design choice inside it |
-| [`docs/DSA-REPORT.md`](docs/DSA-REPORT.md) | Big-O and measured numbers |
-| [`docs/Math/`](docs/Math/README.md) | One page per class — formulas, worked examples, mind maps |
-| [`docs/Math/08-design-patterns/`](docs/Math/08-design-patterns/README.md) | One page per design pattern, and the bug each one fixed |
-| [`docs/Math/09-kafka/`](docs/Math/09-kafka/00-SO-DO-TU-DUY.md) | Kafka and the Modular Services — where the pipeline is cut, and why the URL Frontier is **not** replaced |
-| [`docs/Math/10-images/`](docs/Math/10-images/00-SO-DO-TU-DUY.md) | Image crawling and search — why filtering happens at crawl time |
-| [`docs/Math/11-devops/`](docs/Math/11-devops/00-SO-DO-TU-DUY.md) | CI/CD in detail — every workflow, every gate, file by file |
-| [`docs/Math/12-security/`](docs/Math/12-security/00-SO-DO-TU-DUY.md) | Every defence layer, and what breaks if you remove it |
-| [`docs/EVALUATION.md`](docs/EVALUATION.md) | Search quality measurement (MRR, P@k, nDCG) |
-| [`docs/SO-SANH-PHUONG-AN.md`](docs/SO-SANH-PHUONG-AN.md) | 13 problems, the alternatives rejected, and why |
-| [`docs/GIN-BASELINE.md`](docs/GIN-BASELINE.md) | Head-to-head against PostgreSQL GIN |
-
----
-
 ## Repository layout
 
 ```
@@ -340,20 +238,7 @@ search-engine/          Spring Boot backend (Java 17)
     datastructure/      Trie, BloomFilter, MinHeap, LRUCache, SparseMatrix
     eval/               Search quality harness
 browser-app/            Mini browser (Electron + React + TypeScript)
-  src/renderer/src/components/football/
-                        Full-screen football page, ported from the iOS app
-football-service/       Football data microservice (Go + Postgres), profile `football`
-  internal/apifootball/ API-Football client and normalisers
-  internal/service/     Cache-aside, daily call budget, fallback order
-  internal/sample/      Sample data, so every screen works with no API key
-deploy/
-  k8s/                  Kustomize base + dev/prod overlays
-  kind/                 Local three-node cluster
-docs/                   Documentation
-.github/workflows/      CI, CodeQL, release, PR title checks
+
+
 ```
 
-The Vietnamese dictionary is generated from
-[`coccoc-tokenizer`](https://github.com/coccoc/coccoc-tokenizer) (LGPL-3.0),
-which is **not** vendored here — clone it separately if you need to regenerate
-`vietnamese-words.txt`. See `docs/DSA-REPORT.md` §2.8.

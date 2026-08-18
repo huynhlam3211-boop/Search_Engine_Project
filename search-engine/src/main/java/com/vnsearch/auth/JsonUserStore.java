@@ -21,5 +21,13 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class JsonUserStore implements UserStore { 
-    
+    private static final Logger log = LoggerFactory.getLogger(JsonUserStore.class);
+
+    private final Path path;
+    private final ObjectMapper mapper;
+    private final Map<String, User> users = new ConcurrentHashMap<>();
+
+    public JsonUserStore(String filePath) throws IOException {
+        
+    }
 }

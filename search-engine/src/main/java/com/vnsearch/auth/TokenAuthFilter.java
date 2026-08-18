@@ -13,5 +13,22 @@ import java.io.IOException;
 import java.util.Optional;
 
 public class TokenAuthFilter extends OncePerRequestFilter { 
-    
+    public static final String HEADER = "Authorization";
+    private static final String PREFIX = "Bearer";
+
+    private final SessionStore sessions;
+
+    public TokenAuthFilter(SessionStore sessions) {
+        this.sessions = sessions;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain chain) throws ServletException, IOException {
+
+    }
+
+    private static Optional<String> extractToken(HttpServletRequest request {
+
+    })
 }

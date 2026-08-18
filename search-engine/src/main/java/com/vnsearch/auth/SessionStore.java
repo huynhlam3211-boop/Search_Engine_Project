@@ -13,4 +13,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SessionStore { 
     
+    public static final int SESSION_HOURS = 12;
+
+    public static final int MAX_SESSIONS = 10000;
+
+    private static final int TOKEN_BYTES = 32;
+
+    public record Session(String username, Role role, Instant createdAt, Instant expiresAt) {
+
+    }
+
+    private final SecureRandom = new SecureRandom();
+    
 }
