@@ -20,4 +20,22 @@ import java.util.Random;
 @RequestMapping("/api")
 public class FeedController {
     
+    private static final int MAX_SIZE = 50;
+    private static final int DEFAULT_SIZE = 12;
+    private static final int MAX_PAGE = 100;
+
+    private static final int MAX_FEED_ITEMS = 200;
+    private static final int SNIPPET_LENGTH = 160;
+
+    private final SearchEngineFacade facade;
+    private final ImageStore imageStore;
+
+    private FeedController(SearchEngineFacade facade, ImageStore imageStore) {
+
+    }
+
+    @GetMapping("/feed")
+    public Map<String, Object> feed() {
+        
+    }
 }

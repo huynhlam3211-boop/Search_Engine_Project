@@ -22,5 +22,44 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/users")
 public class AdminUserController { 
+
+    private final UserService users;
+    private final SessionStore sessions;
+
+    public AdminUserController(UserService users, SessionStore sessions) {
+        this.users = users;
+        this.sessions = sessions;
+    }
+
+    public record RoleChange(@NotNull(message = "role không được để trống") Role role) {
+    }
+
+    @GetMapping
+    public List<User.PublicView> list() {
+        return users.findAll().stream().map(User::toPublic).toList();
+    }
+
+    @PostMapping("/{username}/role")
+    public ResponseEntity<User.PublicView> changeRole() {
+
+    }
+
+    @PostMapping("/{username}/disable")
+    public ResponseEntity<User.PublicView> disable(@PathVariable String username,
+                                                    Authentication authentication) {
+
+    }
+
+    @PostMapping("/{username}/enable")
+    public ResponseEntity<User.PublicView> enable(@PathVariable String username)
+            throws IOException { 
+
+    }
+
+    @DeleteMapping("/{username}")
+    public ResponseEntity<Void> delete(@PathVariable String username,
+                                        Authentication authentication) throws IOException { 
+
+    }
     
 }

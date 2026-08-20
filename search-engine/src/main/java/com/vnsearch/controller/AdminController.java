@@ -24,5 +24,44 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 @Validated
 public class AdminController { 
-    
+    private static final int MAX_PAGES_LIMIT = 50_000;
+    private static final int MAX_DEPTH_LIMIT = 10;
+    private static final int MAX_SEEDS = 50;
+
+    private final SearchEngineFacade facade;
+
+    public AdminController(SearchEngineFacade facade) {
+        this.facade = facade;
+    }
+
+    /**
+     * @param maxDepth {@code null} nghia la dung mac dinh 3
+     * @param maxPages {@code null} nghia la dung mac dinh 100
+     */
+
+    public record CrawlRequest() {
+
+    }
+
+    @PostMapping("/crawl")
+    public Map<String, String> crawl(@Valid @RequestBody CrawlRequest request) { 
+
+    }
+
+    @GetMapping("/crawl/{jobId}/status")
+    public ResponseEntity<Map<String, Object>> crawlStatus(@PathVariable String jobId) { 
+
+    }
+
+    @PostMapping("/reindex")
+    public Map<String, String> reindex() throws IOException { 
+
+    }
+
+    @GetMapping("/stats")
+    public Map<String, Object> stats() {
+        
+    }
+
+
 }

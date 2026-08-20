@@ -24,5 +24,33 @@ import java.util.List;
 @RequestMapping("/api/admin/analytics")
 @Validated
 public class AdminAnalyticsController { 
-    
+    private static final int DEFAULT_TOP = 10;
+
+    private final UsageAnalyticsService analytics;
+    private final SearchEngineFacade facade;
+    private final UserService users;
+    private final SessionStore sessions;
+
+    public AdminAnalyticsController(UsageAnalyticsService analytics, SearchEngineFacade facade,
+                                     UserService users, SessionStore sessions) {
+        this.analytics = analytics;
+        this.facade = facade;
+        this.users = users;
+        this.sessions = sessions;
+    }
+
+    @GetMapping
+
+    public AdminDashboard dashboard() {
+
+    }
+
+    private AdminDashboard.AccountStats accountStats() { 
+
+    }
+
+    @PostMapping("/reset")
+    public ResponseEntity<Void> reset() { 
+        
+    }
 }

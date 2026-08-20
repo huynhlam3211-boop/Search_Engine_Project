@@ -19,5 +19,24 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class ImageSearchController { 
-    
+    private static final int MAX_SIZE = 100;
+    private static final int DEFAULT_SIZE = 30;
+    private static final int MAX_PAGE = 100;
+
+    private static final int MAX_SCANNED_PAGES = 300;
+
+    private static final int MAX_TOTAL_IMAGES = 300;
+
+    private final SearchEngineFacade facade;
+    private final ImageStore imageStore;
+
+    public ImageSearchController(SearchEngineFacade facade, ImageStore imageStore) {
+        this.facade = facade;
+        this.imageStore = imageStore;
+    }
+
+    @GetMapping("/images")
+    public Map<String, Object> searchImages() {
+        
+    }
 }

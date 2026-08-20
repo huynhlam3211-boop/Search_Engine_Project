@@ -12,5 +12,23 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class HealthController { 
-    
+    private final SearchEngineFacade facade;
+
+    public HealthController(SearchEngineFacade facade) {
+        this.facade = facade;
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String,Object>> health() {
+        int documents = facade.getIndexedDocumentCount();
+        boolean ready = documents > 0;
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", ready ? "UP" : "OUT_OF_SERVICE");
+        body.put("indexedDocuments", documents);
+
+        return ready    
+                ? ResponseEntity.ok(body)
+                : ResponseEntity.status(503).body(body);
+    }
 }

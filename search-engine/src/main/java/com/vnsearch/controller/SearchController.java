@@ -10,5 +10,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api")
 public class SearchController { 
-    
+    private final UsageAnalyticsService analytics;
+
+    public EventController(UsageAnalyticsService analytics) {
+        this.analytics = analytics;
+    }
+
+    public record EventRequest() {
+
+    }
+
+    @PostMapping("/events")
+    public ResponseEntity<Void> record(@Valid @RequestBody EventRequest request,
+                                        Authentication authentication) { 
+
+    }
 }
