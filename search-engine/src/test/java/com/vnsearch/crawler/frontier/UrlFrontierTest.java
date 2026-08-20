@@ -22,5 +22,82 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class UrlFrontierTest {
+    private static UrlFrontier strictFrontier() {
+        return strictFrontier(UrlFrontier.DEFAULT_MAX_SIZE);
+    }
+
+    private static UrlFrontier strictFrontier(int maxSize) {
+        return new UrlFrontier(maxSize, new DefaultPrioritizer(), new StrictPrioritySelector(),
+                UrlFrontier.DEFAULT_BACK_QUEUE_COUNT);
+    }
+
+    @Test
+    void emptyFrontierReturnsNull() {
+
+    }
+
+    @Test
+    void rejectsDuplicateUrls() {
+
+    }
+
+    @Test
+    void vnDomainGetsHigherPriority() {
+
+    }
+
+    @Test
+    void shallowerDepthGetsHigherPriority() {
+
+    }
+
+    @Test
+    void moreBacklinksGetsHigherPriority() {
+
+    }
+
+    @Test
+    void moreBacklinksGetsHigherPriority() {
+
+    }
+
+    @Test
+    void sameLevelKeepsDiscoveryOrder() {
+
+    }
+
+    @Test
+    void politenessDelayForcesRoundRobinAcrossDomains() {
+
+    }
+
+    @Test
+    void respectsMaxSizeCap() {
+
+    }
+
+    @Test
+    void rejectsInvalidConstructorArguments() {
+
+    }
     
+    @Test
+    void tracksDistinctDomainCount() {
+
+    }
+
+    @Test
+    void domainCountShrinksWhenUrlsAreHandedOut() {
+
+    }
+
+    @Test
+    void urlsMoveFromFrontTierToBackTier() {
+
+    }
+
+    @Test
+    void neverHandsOutSameUrlTwiceUnderConcurrency() throws InterruptedException {
+        
+    }
 }

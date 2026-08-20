@@ -34,6 +34,80 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("kafka-it")
 class KafkaCrawlBusIT { 
-    
+    private static final int MAX_MESSAGE_BYTES = 4 * 1024 * 1024;
+
+    private static KafkaContainer kafka;
+    private static ObjectMapper mapper;
+    private String pagesTopic;
+    private String urlsTopic;
+    private String outlinksTopic;
+    private String imagesTopic;
+
+    @BeforeEach
+    void freshTopics() {
+
+    }
+
+    @BeforeAll
+    static void startBroker() {
+
+    }
+
+    @AfterAll
+    static void stopBroker() {
+
+    }
+
+    private KafkaCrawlEventBus newBus() {
+
+    }
+
+    private static KafkaConsumer<String, String> newConsumer(String topic) {
+
+    }
+
+    private static PageEvent page(String url, String host, String html) {
+
+    }
+
+    @Test
+    void pageEventSurvivesARoundTripThroughKafka() throws Exception {
+
+    }
+
+    @Test
+    void vietnameseDiacriticsSurviveSerialization() throws Exception {
+
+    }
+
+    @Test
+    void allUrlsOfOneHostLandOnTheSamePartition() {
+
+    }
+
+    @Test
+    void differentHostsSpreadAcrossPartitions() {
+
+    }
+
+    @Test
+    void largePageWithinTheRaisedLimitIsAccepted() throws Exception {
+
+    }
+
+    @Test
+    void oversizedMessageIsCountedNotThrown() {
+
+    }
+
+    @Test
+    void eachChannelGoesToItsOwnTopic() throws Exception {
+
+    }
+
+    private static ConsumerRecord<String, String> pollOne(KafkaConsumer<String, String> consumer) {
+        
+    }
 }
