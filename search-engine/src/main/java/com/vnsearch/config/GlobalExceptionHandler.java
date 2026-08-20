@@ -23,5 +23,32 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler { 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(MissingServletRequestParameterException.class) 
+    public ResponseEntity<Map<String, Object>> handleMissingParam() {
+
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class) 
+
     
+
+    @ExceptionHandler(ConstraintViolationException) 
+
+    @ExceptionHandler(UserService.InvalidCredentialsException.class)
+
+    @ExceptionHandler(UserService.AuthException.class)
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+
+    @ExceptionHandler(IllegalArgumentException.class)
+
+    @ExceptionHandler(Exception.class)
+
+    private ResponseEntity<Map<String,Object>> errorResponse() {
+        
+    }
+
+
 }

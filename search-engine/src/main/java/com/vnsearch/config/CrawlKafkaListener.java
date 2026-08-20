@@ -17,5 +17,47 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.crawler.bus", havingValue = "kafka")
 public class CrawlKafkaListeners { 
-    
+    private static final Logger log = LoggerFactory.getLogger(CrawlKafkaListeners.class);
+
+    private final UrlExtractorService urlExtractor;
+    private final ImageDownloadService imageDownload;
+    private final CrawlAnalyticsService analytics;
+    private final CrawlJobManager jobManager;
+
+    public CrawlKafkaListeners(UrlExtractorService urlExtractor,
+                               ImageDownloadService imageDownload,
+                               CrawlAnalyticsService analytics,
+                               CrawlJobManager jobManager) {
+        this.urlExtractor = urlExtractor;
+        this.imageDownload = imageDownload;
+        this.analytics = analytics;
+        this.jobManager = jobManager;
+        log.info("Cac listener Kafka da san sang: 3 Modular Service + 1 bo nap frontier");
+
+        // --- vnsearch.pages: ba consumer group đọc cùng một luồng -----------
+
+        @KafkaListener() {
+
+        }
+
+        @KafkaListener() {
+            
+        }
+
+        @KafkaListener() {
+            
+        }
+
+        @KafkaListener() {
+            
+        }
+
+        @KafkaListener() {
+            
+        }
+
+        @KafkaListener() {
+            
+        }
+    }
 }

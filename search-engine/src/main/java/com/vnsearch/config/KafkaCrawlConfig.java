@@ -51,5 +51,128 @@ import java.util.function.Supplier;
 @EnableKafka
 @ConditionalOnProperty(name = "app.crawler.bus", havingValue = "kafka")
 public class KafkaCrawlConfig { 
-    
+    private static final Logger log = LoggerFactory.getLogger(KafkaCrawlConfig.class);
+
+    private static final int MAX_MESSAGE_BYTES = 4*1024*1024;
+
+    @Value("${app.crawler.kafka.bootstrap-servers}")
+    private String bootstrapServers;
+
+    @Value("${app.crawler.kafka.topic.pages}")
+    private String pagesTopic;
+
+    @Value("${app.crawler.kafka.topic.urls}")
+    private String urlsTopic;
+
+    @Value("${app.crawler.kafka.topic.outlinks}")
+    private String outlinksTopics;
+
+    @Value("${app.crawler.kafka.topic.images}")
+    private String imagesTopic;
+
+    @Value("${app.crawler.kafka.topic.partition:12}")
+    private int partitions;
+
+    @Value("${app.crawler.kafka.replication-factor:1}")
+    private short replicationFactor;
+
+    @Bean
+    public KafkaAdmin crawlKafkaAdmin() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        KafkaAdmin admin = new KafkaAdmin(props);
+        admin.setFatalIfBrokerNotAvailable(true);
+        return admin;
+    }
+
+    @Bean
+    public NewTopic pagesTopic() {
+
+    }
+
+    @Bean
+    public NewTopic urlsTopic() {
+
+    }
+
+    @Bean
+    public NewTopic outlinksTopic() {
+
+    }
+
+    @Bean 
+    public NewTopic imageTopic() {
+
+    }
+
+    @Bean
+    public NewTopic deadLetterTopic() {
+
+    }
+
+
+
+
+    @Bean
+    public ObjectMapper crawlEventObjectMapper() {
+
+    }
+
+    @Bean
+    public ProducerFactory<String, Object> crawlProducerFactory(ObjectMapper crawlerEventObjectMapper) {
+
+    }
+
+    @Bean
+    public ConsumerFactory<String, String> crawlConsumerFactory() {
+
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> crawlKafkaTemplate() {
+
+    }
+
+    @Bean
+    public CrawlEventBus crawlEventBus() {
+
+    }
+
+
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String> crawlListenerContainerFactory() {
+
+    }
+
+    @Bean
+    public UrlFilter workerUrlFilter() {
+
+    }
+
+    @Bean
+    public UrlSeenFilter workerUrlSeenFilter() {
+
+    }
+
+    @Bean 
+    public UrlExtractorService UrlExtractorService() {
+
+    }
+
+    @Bean 
+    public ImageDownloadService imageDownloadService() {
+
+    }
+
+    @Bean
+    public CrawlAnalyticsService crawlAnalyticsService() {
+
+    }
+
+    @Bean
+    public MeterBinder crawlBusMetrics(CrawlEventBus crawlEventBus) {
+        
+    }
+
 }

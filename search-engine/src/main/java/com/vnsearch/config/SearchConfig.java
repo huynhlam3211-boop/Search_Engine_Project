@@ -9,5 +9,20 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SearchConfig { 
+
+    @Bean
+    public Tokenizer tokenizer() {
+        return new VietnameseTokenizer();
+    }
+
+    @Bean
+    public PageRankService pageRankService() {
+        return new PageRankService();
+    }
+
+    @Bean
+    public ImageStore imageStore() {
+        return new ImageStore();
+    }
     
 }

@@ -11,5 +11,18 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.crawler.bus", havingValue = "kafka")
 public class ImageStoreListener { 
-    
+    private static final Logger log = LoggerFactory.getLogger(ImageStoreListener.class);
+
+    private final ImageStore imageStore;
+
+    public ImageStoreListener(ImageStore imageStore) {
+        this.imageStore = imageStore;
+        log.info("Kho anh se duoc nap tu Kafka (vai tro: api)");
+    }
+
+    @KafkaListener()
+
+    public void onImage(ImageFound image) {
+        imageStore.add(image);
+    }
 }

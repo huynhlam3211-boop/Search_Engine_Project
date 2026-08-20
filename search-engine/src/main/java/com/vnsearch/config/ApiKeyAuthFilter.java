@@ -16,5 +16,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 public class ApiKeyAuthFilter extends OncePerRequestFilter { 
-    
+    private static Logger log = LoggerFactory.getLogger(ApiKeyAuthFilter.class);
+
+    public static final String HEADER = "X-API-Key";
+
+    private final byte[] expectedKey;
+
+    public ApiKeyAuthFilter(String expectedKey) {
+        this.expectedKey = expectedKey.getBytes(StandardCharsets.UTF_8);
+
+    }
+
+    @Override
+    protected void doFilterInternal() {
+        
+    }
 }

@@ -12,5 +12,31 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RateLimitFilter extends OncePerRequestFilter { 
-    
+    private static final int MAX_TRACKED_CLIENTS = 100_000;
+
+    private final int capacity;
+    private final boolean enabled;
+    private final boolean trustProxy;
+    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    public RateLimitFilter(int requestsPerMinute, boolean enabled) {
+        this(requestsPerMinute, enabled, false);
+    }
+
+    public RateLimitFilter(int requestPerMinute, boolean enabled, boolean trustProxy) {
+
+    }
+
+    static final class Bucket {
+        private final double 
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response) {
+        
+    }
+
+    private String clientIp(HttpServletRequest request) {
+
+    }
 }

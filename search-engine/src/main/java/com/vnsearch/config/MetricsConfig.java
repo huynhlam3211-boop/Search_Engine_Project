@@ -8,5 +8,10 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class MetricsConfig {
-    
+    @Bean
+    public MeterBinder vnsearchMetrics(SearchEngineFacade facade) { 
+        return registry -> { 
+            
+        }
+    }
 }

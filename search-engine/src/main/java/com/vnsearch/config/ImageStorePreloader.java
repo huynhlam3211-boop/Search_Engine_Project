@@ -13,5 +13,21 @@ import java.util.List;
 
 @Component
 public class ImageStorePreloader { 
-    
+    private static final Logger log = LoggerFactory.getLogger(ImageStorePreloader.class);
+
+    @Value("${app.crawler.data-path}")
+
+    private String crawledDataPath;
+
+    private final ImageStore imageStore
+
+    public ImageStorePreloader(ImageStore imageStore) {
+        this.imageStore = imageStore;
+    }
+
+    @PostConstruct
+    public void preload() { 
+        
+    }
+
 }
