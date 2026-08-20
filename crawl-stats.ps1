@@ -1,29 +1,12 @@
 #requires -version 5.1
-<#
-    Thống kê corpus đã crawl: bao nhiêu trang, bao nhiêu liên kết, tốn bao nhiêu GB.
 
-    Không gọi trực tiếp — chạy qua crawl-stats.bat để bảng mã console được đặt
-    đúng (tệp .bat gọi chcp 65001 trước, nếu không chữ tiếng Việt có dấu ở đây
-    sẽ ra dấu hỏi).
-
-    Cách đọc tệp: đọc TỪNG DÒNG bằng StreamReader chứ không ConvertFrom-Json.
-    Corpus đang là 87 MB và sẽ còn lớn hơn; nạp cả cây JSON vào bộ nhớ tốn vài
-    trăm MB và mất hàng chục giây, trong khi mọi con số cần ở đây đều đọc được
-    từ một lần quét tuyến tính — 0,7 giây cho 87 MB. Cấu trúc tệp do Jackson
-    sinh ra (SerializationFeature.INDENT_OUTPUT) đặt mỗi trường trên một dòng
-    riêng và cả mảng outlinks gọn trong MỘT dòng, nên cách đọc này khớp tự
-    nhiên. Vẫn có nhánh dự phòng cho trường hợp mảng bị xuống dòng.
-#>
 [CmdletBinding()]
 param(
-    # Tệp .json hoặc thư mục cần thống kê. Bỏ trống: quét thư mục data mặc định.
     [Parameter(Position = 0)]
     [string]$Path,
 
-    # Bỏ qua phần đếm liên kết (nhanh hơn, ít RAM hơn) khi chỉ cần dung lượng.
     [switch]$NoLinks,
 
-    # Bỏ qua phần thống kê ảnh.
     [switch]$NoImages
 )
 
@@ -55,8 +38,6 @@ function Write-Field {
     Write-Host $Value
 }
 
-# Dòng con, thụt vào dưới một Write-Field: bóc tách một con số vừa in ra thành
-# các thành phần của nó. Cả dòng để màu tối cho mắt bám được thứ bậc.
 function Write-Sub {
     param([string]$Label, [string]$Value)
     Write-Host ('       {0,-23} {1}' -f $Label, $Value) -ForegroundColor DarkGray
@@ -80,16 +61,12 @@ function Measure-Corpus {
     $links     = New-Object 'System.Collections.Generic.HashSet[string]'
     $domains   = @{}
 
-    # Số outlink của TỪNG trang, để tính trung vị và trang nhiều link nhất.
-    # Trung bình cộng một mình dễ đánh lừa: vài trang chuyên mục với hàng trăm
-    # link kéo nó lên cao hơn hẳn trang bài viết bình thường.
     $perPage   = New-Object 'System.Collections.Generic.List[int]'
     $noOut     = 0
     $maxOut    = 0
     $maxUrl    = ''
     $curUrl    = ''
 
-    # Dùng cho nhánh dự phòng: mảng outlinks trải trên nhiều dòng.
     $pending   = $null
 
     $reader = New-Object System.IO.StreamReader($File.FullName, [System.Text.Encoding]::UTF8)

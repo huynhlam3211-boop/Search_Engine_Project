@@ -1,9 +1,4 @@
 @echo off
-rem KHONG viet tieng Viet co dau trong file .bat: cmd.exe phan tich file theo
-rem byte offset, ky tu da byte lam lech con tro doc va cat vun cac dong lenh
-rem phia sau. Ly do day du xem trong run-crawl.bat. Phan chu co dau nam trong
-rem crawl-stats.ps1 - PowerShell doc file theo bang ma chu khong theo byte nen
-rem khong dinh loi nay.
 setlocal
 
 rem Bat UTF-8 cho console de chu tieng Viet cua script PowerShell hien dung.
@@ -19,22 +14,6 @@ if not exist "%PS1%" (
     goto :fail
 )
 
-rem --- Tham so ---
-rem   crawl-stats.bat                      thong ke moi corpus trong search-engine/data
-rem   crawl-stats.bat data/thu-nghiem.json chi mot tep
-rem   crawl-stats.bat -NoLinks             bo qua phan dem lien ket (nhanh hon)
-rem   crawl-stats.bat -NoImages            bo qua phan thong ke anh
-rem   them --no-pause de khong dung lai o cuoi (dung khi goi tu script khac)
-rem
-rem Bao cao gom ba phan cho MOI corpus:
-rem   1. Trang    : so trang, ten mien, trang khong co noi dung
-rem   2. Lien ket : outlinks tong/khac nhau, hang doi con lai, uoc tinh dung luong
-rem   3. Anh      : so anh, ty le co alt, so trang co anh, top ten mien, dinh dang
-rem
-rem Phan anh doc tu tep "<ten-corpus>.images.json" nam canh corpus - do
-rem ImageStorage phia Java ghi ra o cuoi moi phien crawl. Corpus crawl bang ban
-rem ma cu chua co tep nay; chay lai run-crawl.bat mot lan la co (crawl noi tiep,
-rem khong mat du lieu cu).
 set "ARGS="
 set "NOPAUSE="
 :parse
@@ -48,8 +27,6 @@ shift
 goto :parse
 :parsed
 
-rem -ExecutionPolicy Bypass: script nam ngay trong repo va do nguoi dung tu
-rem chay, khong can vuong chinh sach mac dinh Restricted cua Windows.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %ARGS%
 if errorlevel 1 goto :fail
 
@@ -71,8 +48,6 @@ call :restore_cp
 endlocal
 exit /b 1
 
-rem Tra bang ma ve nhu cu: chcp doi trang thai ca cua so console, khong phai
-rem bien moi truong, nen endlocal khong don dep ho.
 :restore_cp
 if defined OLD_CP chcp %OLD_CP% >nul
 goto :eof
