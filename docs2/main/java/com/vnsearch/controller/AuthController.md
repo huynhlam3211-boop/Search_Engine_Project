@@ -584,6 +584,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
      là những thứ đã hoặc có thể hỏng âm thầm.
 ```
 
+---
 
 ## 10. Liên kết
 

@@ -315,7 +315,6 @@ void tokenHongKhongChanDuongCongKhai() throws Exception {
 
 ---
 
-
 ## 6. Liên kết
 
 - Nơi token được sinh và tra: [`SessionStore.md`](./SessionStore.md)

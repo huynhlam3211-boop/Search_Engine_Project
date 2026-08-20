@@ -455,7 +455,6 @@ kubectl get deployment backend -o jsonpath='{.spec.replicas}'
 
 ---
 
-
 ## 9. Liên kết
 
 - Lớp chuyển tiếp Kafka chính, và bình luận chặn phép gộp: [`CrawlKafkaListeners.md`](./CrawlKafkaListeners.md) mục 4

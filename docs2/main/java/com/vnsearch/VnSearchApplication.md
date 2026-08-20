@@ -265,8 +265,7 @@ sequenceDiagram
 - [8. Hướng dẫn về code](#8-hướng-dẫn-về-code)
 - [9. Độ phức tạp & chi phí](#9-độ-phức-tạp--chi-phí)
 - [10. Kiểm thử liên quan](#10-kiểm-thử-liên-quan)
-- [11. Chấm theo chuẩn doanh nghiệp](#11-chấm-theo-chuẩn-doanh-nghiệp)
-- [12. Liên kết](#12-liên-kết)
+- [11. Liên kết](#11-liên-kết)
 
 ---
 

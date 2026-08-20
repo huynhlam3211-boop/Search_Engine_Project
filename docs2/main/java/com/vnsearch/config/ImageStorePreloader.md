@@ -479,7 +479,6 @@ curl -s localhost:8080/api/images?q=test | jq '.total'
 
 ---
 
-
 ## 10. Liên kết
 
 - Lớp đọc/ghi tệp ảnh, và hàm `pathFor` dùng chung: [`../crawler/modular/ImageStorage.md`](../crawler/modular/ImageStorage.md)

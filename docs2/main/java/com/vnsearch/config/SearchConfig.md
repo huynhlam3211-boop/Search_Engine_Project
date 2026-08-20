@@ -406,6 +406,8 @@ public class IndexBuilder {
      canh giữ bất biến quan trọng nhất của máy tìm kiếm.
 ```
 
+---
+
 ## 9. Liên kết
 
 - Bản cài đặt tokenizer được dựng ở đây: [`../index/VietnameseTokenizer.md`](../index/VietnameseTokenizer.md)

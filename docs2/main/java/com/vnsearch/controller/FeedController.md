@@ -513,6 +513,8 @@ curl -s "http://localhost:8080/api/feed?seed=2059&page=1&size=12" | jq
      sáu tính chất kia, và nó kiểm được bằng hai dòng.
 ```
 
+---
+
 ## 9. Liên kết
 
 - Cùng bài toán phân trang ổn định, lời giải khác: [`ImageSearchController.md`](./ImageSearchController.md) mục 3

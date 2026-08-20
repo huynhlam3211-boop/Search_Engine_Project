@@ -261,6 +261,8 @@ cd search-engine
 .\mvnw.cmd -q -Dtest='JsonUserStoreTest,UserServiceTest' test
 ```
 
+---
+
 ## 6. Liên kết
 
 - Bản cài đặt duy nhất hiện có: [`JsonUserStore.md`](./JsonUserStore.md)

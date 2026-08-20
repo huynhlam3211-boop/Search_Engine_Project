@@ -470,6 +470,8 @@ curl -X POST -H "X-API-Key: $ADMIN_API_KEY" \
      có thể xảy ra thật.
 ```
 
+---
+
 ## 9. Liên kết
 
 - Hình dạng dữ liệu trả về: [`../analytics/AdminDashboard.md`](../analytics/AdminDashboard.md) · [`../analytics/UsageSnapshot.md`](../analytics/UsageSnapshot.md) · [`../analytics/CorpusStats.md`](../analytics/CorpusStats.md)

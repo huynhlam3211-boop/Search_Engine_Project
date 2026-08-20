@@ -420,6 +420,7 @@ curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:8080/api/admin/stats
      trong lớp này — xem đề xuất 3.
 ```
 
+---
 
 ## 8. Liên kết
 

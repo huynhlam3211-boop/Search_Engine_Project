@@ -464,6 +464,8 @@ curl -X POST http://localhost:8080/api/events \
      không phải "số liệu sai" mà là VU KHỐNG.
 ```
 
+---
+
 ## 9. Liên kết
 
 - Lớp nhận và tổng hợp sự kiện, nơi chuỗi bị cắt lần thứ hai: [`../analytics/UsageAnalyticsService.md`](../analytics/UsageAnalyticsService.md)

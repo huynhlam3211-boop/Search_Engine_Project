@@ -558,6 +558,8 @@ assertFalse(forLogQuaPhanXa("a\nFAKE LOG").contains("\n"));
 // 3. Bộ đếm khoá tạm ĐẶT LẠI sau khi hết hạn
 ```
 
+---
+
 ## 9. Liên kết
 
 - Nơi lưu tài khoản: [`UserStore.md`](./UserStore.md) → [`JsonUserStore.md`](./JsonUserStore.md)

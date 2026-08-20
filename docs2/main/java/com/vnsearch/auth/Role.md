@@ -213,6 +213,7 @@ void giaTriLaHaVeUser() {
 }
 ```
 
+---
 
 ## 6. Liên kết
 
