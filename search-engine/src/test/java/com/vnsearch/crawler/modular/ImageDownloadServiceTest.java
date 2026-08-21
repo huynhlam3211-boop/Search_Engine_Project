@@ -16,6 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Modular Service 2 — bo anh ra khoi DOM.
+ *
+ * <p>Moi bai test chay o CHE DO MAC DINH (khong tai noi dung), nen khong bai
+ * nao mo mot ket noi mang. Do vua la hanh vi mac dinh dung, vua la thu khien
+ * bo test chay duoc o moi truong khong co mang.
+ */
 class ImageDownloadServiceTest {
 
     private InProcessCrawlEventBus bus;
@@ -50,6 +57,11 @@ class ImageDownloadServiceTest {
         assertFalse(service.isDownloadEnabled());
     }
 
+    /**
+     * Anh nap tre (lazy loading): dia chi that nam o data-src, con src chi la
+     * anh giu cho. Do tren vnexpress.net: 22/31 the img dung kieu nay — chi
+     * doc src thi thu duy nhat lot vao kho la logo va icon cua site.
+     */
     @Test
     void prefersDataSrcOverPlaceholderSrc() {
         new ImageDownloadService(bus).onPage(pageWith("""
@@ -62,6 +74,7 @@ class ImageDownloadServiceTest {
                 "Phai lay data-src, khong phai anh giu cho o src");
     }
 
+    /** Quy uoc cu cua jQuery Lazy Load, van con gap tren site doi truoc. */
     @Test
     void fallsBackToDataOriginal() {
         new ImageDownloadService(bus).onPage(
@@ -69,6 +82,7 @@ class ImageDownloadServiceTest {
         assertEquals("https://a.com/cu.jpg", found.get(0).imageUrl());
     }
 
+    /** Khong co data-src thi src van duoc dung nhu binh thuong. */
     @Test
     void usesPlainSrcWhenThereIsNoLazyAttribute() {
         new ImageDownloadService(bus).onPage(
@@ -82,6 +96,10 @@ class ImageDownloadServiceTest {
         assertEquals("https://a.com/tinh/anh.png", found.get(0).imageUrl());
     }
 
+    /**
+     * Cat query truoc khi xet duoi tep. Bo buoc nay thi gan nhu MOI anh that
+     * tren bao dien tu bi loai — chung deu co tham so doi kich thuoc.
+     */
     @Test
     void acceptsImagesWithQueryStringAfterTheExtension() {
         new ImageDownloadService(bus).onPage(pageWith("""
@@ -112,6 +130,7 @@ class ImageDownloadServiceTest {
         assertEquals(1, service.getImagesSkippedByExtensionCount());
     }
 
+    /** Mot trang thuong lap cung mot anh o nhieu cho. */
     @Test
     void deduplicatesRepeatedImagesOnTheSamePage() {
         new ImageDownloadService(bus).onPage(pageWith("""
@@ -121,6 +140,7 @@ class ImageDownloadServiceTest {
         assertEquals(1, found.size());
     }
 
+    /** Trang thu vien anh co the co hang nghin the img. */
     @Test
     void respectsTheMaxImagesPerPageLimit() {
         ImageDownloadService service = new ImageDownloadService(
@@ -208,6 +228,13 @@ class ImageDownloadServiceTest {
                 () -> new ImageDownloadService(bus, new DnsResolver(), false, 10, 0, 1000));
     }
 
+    /**
+     * SSRF: khi BAT tai anh, mot dia chi noi bo phai bi chan va service phai
+     * lui ve ban ghi sieu du lieu — khong nem, khong lam chet ca trang.
+     *
+     * <p>169.254.169.254 la dia chi dich vu sieu du lieu cua may ao dam may;
+     * day dung la dia chi ma SeedUrlValidator sinh ra de chan.
+     */
     @Test
     void blockedAddressFallsBackToMetadataWhenDownloadEnabled() {
         ImageDownloadService service = new ImageDownloadService(

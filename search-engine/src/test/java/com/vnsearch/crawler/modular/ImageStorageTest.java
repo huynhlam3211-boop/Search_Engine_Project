@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertLinesMatch;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** Ghi va doc kho anh xuong dia. */
 class ImageStorageTest {
 
     private static ImageFound image(String pageUrl, String imageUrl, String alt) {
@@ -24,10 +25,23 @@ class ImageStorageTest {
     void derivesImagePathFromCorpusPath() {
         assertEquals("data/crawled-documents.images.json",
                 ImageStorage.pathFor("data/crawled-documents.json"));
-       
+        // Duong dan khong co duoi .json van phai ra mot ten dung duoc, khong
+        // duoc cat mat ky tu nao cua ten goc.
         assertEquals("data/corpus.images.json", ImageStorage.pathFor("data/corpus"));
     }
 
+    /**
+     * Vong ghi -&gt; doc phai khep kin.
+     *
+     * <p>Day la bai test dat gia nhat cua lop nay. {@link ImageFound} co hai
+     * phuong thuc {@code isDownloaded()} va {@code missingAlt()} mang
+     * {@code @JsonIgnore}; neu mot trong hai mat annotation do, Jackson ghi
+     * them mot truong khong ung voi component nao cua record, va luc DOC LAI se
+     * nem {@code UnrecognizedPropertyException}.
+     *
+     * <p>Hong theo kieu do khong lo ra o phia ghi — tep van duoc tao, van dung
+     * JSON. No chi no o lan khoi dong backend tiep theo.
+     */
     @Test
     void writesAndReadsBackEveryField(@TempDir Path dir) throws IOException {
         ImageFound original = new ImageFound(
@@ -58,6 +72,13 @@ class ImageStorageTest {
         assertTrue(back.missingAlt());
     }
 
+    /**
+     * Danh sach RONG van phai tao ra tep.
+     *
+     * <p>Tep chua {@code []} noi "da crawl, khong tim duoc anh nao"; khong co
+     * tep noi "chua crawl lan nao". Hai ca do can hai loi khuyen khac nhau o
+     * {@code crawl-stats}, nen bo qua viec ghi khi rong se xoa mat su phan biet.
+     */
     @Test
     void writesFileEvenWhenThereAreNoImages(@TempDir Path dir) throws IOException {
         String path = dir.resolve("corpus.images.json").toString();
@@ -77,6 +98,13 @@ class ImageStorageTest {
         assertEquals(1, ImageStorage.loadFromJson(path).size());
     }
 
+    /**
+     * Khong de lai tep {@code .tmp} sau mot lan ghi thanh cong.
+     *
+     * <p>Ghi nguyen tu la ghi ra {@code .tmp} roi doi ten. Neu buoc doi ten
+     * khong xay ra, tep dich van dung nhung rac tich luy mot ban sao day du cho
+     * MOI lan ghi diem kiem tra — hang chuc lan moi phien crawl.
+     */
     @Test
     void leavesNoTempFileBehind(@TempDir Path dir) throws IOException {
         String path = dir.resolve("corpus.images.json").toString();
@@ -86,6 +114,13 @@ class ImageStorageTest {
         assertFalse(Files.exists(Path.of(path + ".tmp")));
     }
 
+    /**
+     * Ghi de phai THAY THE hoan toan, khong noi them.
+     *
+     * <p>Diem kiem tra ghi de len cung mot tep hang chuc lan trong mot phien.
+     * Neu lan ghi sau chi noi vao duoi, tep se thanh hai mang JSON noi nhau —
+     * khong doc lai duoc, va chi phat hien ra o lan khoi dong sau.
+     */
     @Test
     void overwritesInsteadOfAppending(@TempDir Path dir) throws IOException {
         String path = dir.resolve("corpus.images.json").toString();
@@ -100,6 +135,15 @@ class ImageStorageTest {
         assertEquals("https://a.vn/3.jpg", back.get(0).imageUrl());
     }
 
+    /**
+     * Moi truong nam tren MOT DONG rieng.
+     *
+     * <p>Rang buoc nay den tu ben ngoai Java: {@code crawl-stats.ps1} doc tep
+     * bang {@code StreamReader} theo tung dong, doi chieu tien to
+     * {@code "imageUrl"} de dem. Tat {@code INDENT_OUTPUT} thi ca mang don lai
+     * mot dong, va thong ke anh im lang tra ve 0 — khong co loi bien dich nao
+     * bat duoc dieu do, nen no duoc chot o day.
+     */
     @Test
     void writesOneFieldPerLineForTheStatsScript(@TempDir Path dir) throws IOException {
         String path = dir.resolve("corpus.images.json").toString();
@@ -121,6 +165,13 @@ class ImageStorageTest {
                 "\"contentHash\" : .*"), trimmed);
     }
 
+    /**
+     * Tep thieu hoac hong thi tra ve danh sach rong, khong nem ngoai le.
+     *
+     * <p>{@code ImageStorePreloader} goi ham nay tren duong KHOI DONG backend.
+     * Nem o day nghia la mot tep anh hong lam ca ung dung khong len duoc — ke ca
+     * phan tim kiem van ban von chang lien quan gi toi anh.
+     */
     @Test
     void loadQuietlyNeverThrows(@TempDir Path dir) throws IOException {
         assertEquals(List.of(), ImageStorage.loadQuietly(dir.resolve("khong-co.json").toString()));

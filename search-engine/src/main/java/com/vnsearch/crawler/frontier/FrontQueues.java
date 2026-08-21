@@ -11,6 +11,7 @@ public final class FrontQueues {
     private final FrontQueueSelector selector;
 
     private final int[] sizes;
+    private int total;
 
     public FrontQueues(int levels, FrontQueueSelector selector) {
         if (levels <= 0) {

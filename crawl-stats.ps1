@@ -7,7 +7,9 @@ param(
 
     [switch]$NoLinks,
 
-    [switch]$NoImages
+    [switch]$NoImages,
+
+    [switch]$NoTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -516,6 +518,114 @@ function Get-Host2 {
     return $rest
 }
 
+# ------------------------------------------------------------------ quét test
+
+# Đọc kết quả từ báo cáo Surefire đã có sẵn trên đĩa, KHÔNG chạy lại `mvn test`.
+# Chạy lại mất gần một phút và sẽ biến một lệnh xem thống kê thành một lệnh
+# build — cái giá đó không đáng cho một mục phụ. Đổi lại, con số có thể đã cũ,
+# nên phải tự kiểm tra và nói ra (xem Show-TestReport).
+function Measure-Tests {
+    param([string]$ReportDir)
+
+    if (-not (Test-Path -LiteralPath $ReportDir)) { return $null }
+    $files = @(Get-ChildItem -LiteralPath $ReportDir -Filter 'TEST-*.xml' -File -ErrorAction SilentlyContinue)
+    if ($files.Count -eq 0) { return $null }
+
+    $total = 0; $failures = 0; $errors = 0; $skipped = 0
+    $failed = @()
+    $newest = [datetime]::MinValue
+
+    foreach ($f in $files) {
+        if ($f.LastWriteTime -gt $newest) { $newest = $f.LastWriteTime }
+        try { [xml]$doc = Get-Content -LiteralPath $f.FullName -Raw } catch { continue }
+        $suite = $doc.testsuite
+        if (-not $suite) { continue }
+
+        # Đếm phần tử <testcase>, KHÔNG dùng thuộc tính tests= của <testsuite>.
+        # Với lớp có @Nested, Surefire ghi tests= thiếu (CrawlEventTest: tests=23
+        # nhưng có 24 <testcase>), nên cộng thuộc tính đó cho ra tổng lệch với
+        # con số Maven in ra ở cuối `mvn test`. Đếm phần tử thì khớp.
+        foreach ($case in @($suite.testcase)) {
+            if ($null -eq $case) { continue }
+            $total++
+            if ($case.failure) {
+                $failures++
+            } elseif ($case.error) {
+                $errors++
+            } elseif ($case.skipped) {
+                $skipped++
+            }
+            if ($case.failure -or $case.error) {
+                $failed += [pscustomobject]@{
+                    Class = $suite.name
+                    Name  = $case.name
+                }
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Classes  = $files.Count
+        Total    = $total
+        Failures = $failures
+        Errors   = $errors
+        Skipped  = $skipped
+        Passed   = $total - $failures - $errors - $skipped
+        Failed   = $failed
+        RunAt    = $newest
+    }
+}
+
+function Show-TestReport {
+    param($Stat, [string]$SourceRoot)
+
+    Write-Host ''
+    Write-Host '  BỘ TEST' -ForegroundColor Green
+    Write-Host '  -------'
+
+    if ($null -eq $Stat -or $Stat.Total -eq 0) {
+        Write-Host '  Chưa có báo cáo test nào.' -ForegroundColor DarkYellow
+        Write-Host '  Chạy một lần: search-engine\mvnw.cmd test' -ForegroundColor DarkGray
+        return
+    }
+
+    $allGreen = ($Stat.Failures -eq 0 -and $Stat.Errors -eq 0)
+    if ($allGreen) { $color = 'Green' } else { $color = 'Red' }
+
+    Write-Host ('  {0,-24}: ' -f 'Test xanh') -NoNewline -ForegroundColor Gray
+    Write-Host ('{0}/{1}' -f $Stat.Passed, $Stat.Total) -NoNewline -ForegroundColor $color
+    if ($allGreen) {
+        Write-Host '  (tất cả đều qua)' -ForegroundColor DarkGray
+    } else {
+        Write-Host ('  ({0:P1})' -f ($Stat.Passed / $Stat.Total)) -ForegroundColor DarkGray
+    }
+
+    Write-Field 'Lớp test' ('{0:N0}' -f $Stat.Classes)
+    if ($Stat.Failures -gt 0) { Write-Sub 'thất bại (assert sai)' ('{0:N0}' -f $Stat.Failures) }
+    if ($Stat.Errors   -gt 0) { Write-Sub 'lỗi (ném ngoại lệ)'    ('{0:N0}' -f $Stat.Errors) }
+    if ($Stat.Skipped  -gt 0) { Write-Sub 'bỏ qua'                ('{0:N0}' -f $Stat.Skipped) }
+    Write-Field 'Chạy lúc' ('{0:yyyy-MM-dd HH:mm:ss}  ({1})' -f $Stat.RunAt, (Format-Age $Stat.RunAt))
+
+    foreach ($f in $Stat.Failed) {
+        $shortClass = $f.Class -replace '^com\.vnsearch\.', ''
+        Write-Host ('       {0}.{1}' -f $shortClass, $f.Name) -ForegroundColor Red
+    }
+
+    # Con số đọc từ đĩa chỉ đúng với bản mã tại thời điểm chạy test. Có tệp
+    # nguồn mới hơn báo cáo nghĩa là nó đã lỗi thời — im lặng ở đây thì người
+    # đọc tin vào một kết quả không còn phản ánh mã hiện tại.
+    if ($SourceRoot -and (Test-Path -LiteralPath $SourceRoot)) {
+        $newerSource = @(Get-ChildItem -LiteralPath $SourceRoot -Filter '*.java' -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -gt $Stat.RunAt })
+        if ($newerSource.Count -gt 0) {
+            Write-Host ''
+            Write-Host ('  [CHÚ Ý] {0} tệp .java đã sửa SAU lần chạy test này.' -f $newerSource.Count) -ForegroundColor DarkYellow
+            Write-Host '          Con số ở trên không còn phản ánh mã hiện tại.' -ForegroundColor DarkGray
+            Write-Host '          Chạy lại: search-engine\mvnw.cmd test' -ForegroundColor DarkGray
+        }
+    }
+}
+
 # ------------------------------------------------------------------ báo cáo
 
 function Show-Report {
@@ -778,6 +888,12 @@ if ($tmp.Count -gt 0) {
     foreach ($t in $tmp) {
         Write-Host ('  [CHÚ Ý] Còn tệp tạm "{0}" ({1}) — một lần ghi bị cắt ngang, xoá được.' -f $t.Name, (Format-Size $t.Length)) -ForegroundColor DarkYellow
     }
+}
+
+if (-not $NoTests) {
+    $engineRoot = Join-Path $root 'search-engine'
+    Show-TestReport -Stat (Measure-Tests (Join-Path $engineRoot 'target\surefire-reports')) `
+                    -SourceRoot (Join-Path $engineRoot 'src')
 }
 
 Write-Host ''

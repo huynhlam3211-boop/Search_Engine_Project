@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Kho anh phuc vu {@code GET /api/images} — MOT anh dai dien cho moi trang.
+ */
 class ImageStoreTest {
 
     private ImageStore store;
@@ -26,6 +29,7 @@ class ImageStoreTest {
         store = new ImageStore();
     }
 
+    /** Anh noi dung binh thuong: khong phai svg/thumb, co alt, co kich thuoc. */
     private static ImageFound image(String pageUrl, String imageUrl) {
         return ImageFound.metadataOnly(pageUrl, "a.vn", imageUrl, "mo ta", 800, 600);
     }
@@ -48,6 +52,10 @@ class ImageStoreTest {
         assertEquals(List.of(), store.forPage("https://a.vn/khong-co"));
     }
 
+    /**
+     * Anh THU HAI cua cung mot trang khong duoc them vao — no thay the anh cu
+     * neu tot hon, con khong thi bi bo.
+     */
     @Test
     void aSecondImageNeverGrowsThePage() {
         store.add(sized("https://a.vn/bai", "https://a.vn/nho.jpg", 300));
@@ -58,6 +66,7 @@ class ImageStoreTest {
         assertEquals(1, store.imageCount());
     }
 
+    /** Anh RONG hon thang — day la tieu chi chinh khi cung bac. */
     @Test
     void keepsTheWiderImage() {
         store.add(sized("https://a.vn/bai", "https://a.vn/nho.jpg", 300));
@@ -66,6 +75,13 @@ class ImageStoreTest {
         assertEquals("https://a.vn/to.jpg", store.forPage("https://a.vn/bai").get(0).imageUrl());
     }
 
+    /**
+     * KET QUA KHONG PHU THUOC THU TU DEN.
+     *
+     * <p>O che do Kafka, thu tu thong diep GIUA cac phan hoach khong duoc bao
+     * dam. Neu phep chon phu thuoc thu tu thi hai lan crawl cung mot trang co
+     * the cho hai anh dai dien khac nhau — mot loi khong tai lap duoc.
+     */
     @Test
     void resultDoesNotDependOnArrivalOrder() {
         ImageStore xuoi = new ImageStore();
@@ -80,6 +96,12 @@ class ImageStoreTest {
                 nguoc.forPage("https://a.vn/b").get(0).imageUrl());
     }
 
+    /**
+     * Logo THUA anh bai viet, ke ca khi logo den truoc va co alt.
+     *
+     * <p>Day la ca da quan sat duoc tren du lieu that: mot anh 100x42 mang
+     * {@code alt="Fica"} nam o dau ket qua tim kiem anh.
+     */
     @Test
     void aLogoLosesToAnArticlePhoto() {
         store.add(ImageFound.metadataOnly(
@@ -90,6 +112,7 @@ class ImageStoreTest {
         assertEquals("https://a.vn/anh-bai.jpg", store.forPage("https://a.vn/bai").get(0).imageUrl());
     }
 
+    /** Anh svg la do hoa vector — logo hoac icon, khong bao gio la anh bai. */
     @Test
     void svgLosesToAPhotoEvenWithoutDeclaredSize() {
         store.add(ImageFound.metadataOnly(
@@ -100,6 +123,12 @@ class ImageStoreTest {
         assertEquals("https://a.vn/anh.jpg", store.forPage("https://a.vn/bai").get(0).imageUrl());
     }
 
+    /**
+     * Khong co ung vien nao tot thi VAN phai giu mot tam.
+     *
+     * <p>Mot trang chi co logo van nen xuat hien o tab Hinh anh — bo han no di
+     * thi trang do bien mat khoi ket qua, trong khi no van la mot trang hop le.
+     */
     @Test
     void keepsADecorativeImageWhenItIsTheOnlyOne() {
         store.add(ImageFound.metadataOnly(
@@ -108,6 +137,11 @@ class ImageStoreTest {
         assertEquals(1, store.forPage("https://a.vn/bai").size());
     }
 
+    /**
+     * Thu tu trang truyen vao CHINH LA thu tu xep hang cua may tim kiem, nen
+     * phai giu nguyen — nho vay tab Hinh anh thua huong chat luong xep hang cua
+     * tab Web ma khong can mot mo hinh xep hang rieng cho anh.
+     */
     @Test
     void forPagesKeepsThePageOrder() {
         store.add(image("https://a.vn/hai", "https://a.vn/2.jpg"));
@@ -121,6 +155,7 @@ class ImageStoreTest {
         assertEquals("https://a.vn/2.jpg", images.get(1).imageUrl());
     }
 
+    /** Cung mot anh la dai dien cua nhieu trang thi chi hien mot lan. */
     @Test
     void forPagesShowsARepeatedImageOnlyOnce() {
         store.add(image("https://a.vn/mot", "https://a.vn/chung.jpg"));
@@ -129,6 +164,12 @@ class ImageStoreTest {
         assertEquals(1, store.forPages(List.of("https://a.vn/mot", "https://a.vn/hai"), 10).size());
     }
 
+    /**
+     * MOI LAN DOC PHAI CHO CUNG MOT KET QUA — dieu kien de phan trang chay dung.
+     *
+     * <p>Lo 2 cua tab Hinh anh lech so voi lo 1 thi anh vua LAP vua THIEU khi
+     * nguoi dung cuon xuong, va khong loi nao duoc nem ra.
+     */
     @Test
     void repeatedReadsGiveTheSameOrder() {
         for (int i = 0; i < 20; i++) {
@@ -144,6 +185,11 @@ class ImageStoreTest {
             assertEquals(lan1, store.forPages(pages, 100), "Moi lan doc phai cho cung mot ket qua");
         }
     }
+
+    /**
+     * Cat lat lien tiep phai phu het danh sach, khong lap khong thieu — chinh
+     * la thu ma tab Hinh anh lam khi cuon.
+     */
     @Test
     void consecutiveSlicesCoverEverythingExactlyOnce() {
         List<String> pages = new ArrayList<>();
@@ -174,6 +220,10 @@ class ImageStoreTest {
         assertEquals(0, store.forPages(null, 5).size());
     }
 
+    /**
+     * Nap mot tep ghi bang ban ma CU (nhieu anh moi trang) phai tu rut xuong
+     * mot anh moi trang, va giu dung tam tot nhat.
+     */
     @Test
     void addAllCollapsesAnOldMultiImageFile() {
         List<ImageFound> cu = List.of(
@@ -217,6 +267,14 @@ class ImageStoreTest {
         assertEquals(1L, snapshot.get("candidatesRejected"));
     }
 
+    /**
+     * Kho bi ghi tu nhieu worker cua crawler VA tu nhieu luong consumer Kafka
+     * cung luc.
+     *
+     * <p>Moi luong do MOT anh rong nhat cua rieng no vao CUNG mot trang. Neu
+     * phep so-sanh-roi-ghi khong nguyen tu, mot tam thua co the bi mot tam thua
+     * kem hon ghi de — va ket qua se khac nhau giua cac lan chay.
+     */
     @Test
     void isThreadSafeUnderConcurrentWrites() throws Exception {
         int threads = 8;
@@ -230,6 +288,7 @@ class ImageStoreTest {
             pool.submit(() -> {
                 try {
                     for (int i = 0; i < perThread; i++) {
+                        // Be rong tang dan; luong cuoi cung co tam rong nhat.
                         store.add(sized("https://a.vn/chung", "https://a.vn/" + id + "-" + i + ".jpg",
                                 200 + id * perThread + i));
                         store.add(image("https://a.vn/rieng-" + id, "https://a.vn/r" + id + "-" + i + ".jpg"));
@@ -246,15 +305,19 @@ class ImageStoreTest {
         pool.shutdownNow();
         assertEquals(List.of(), loi);
 
+        // 8 trang rieng + 1 trang chung.
         assertEquals(threads + 1, store.pageCount());
         assertEquals(threads + 1, store.all().size());
 
+        // Tam rong nhat trong TAT CA cac luong phai thang, du luong nao ghi sau.
         int rongNhat = 200 + (threads - 1) * perThread + (perThread - 1);
         assertEquals(rongNhat, store.forPage("https://a.vn/chung").get(0).declaredWidth());
     }
 
     @Test
     void respectsThePageLimit() {
+        // Khong dung MAX_PAGES that (50.000) — bai test se cham. Kiem tra bang
+        // chinh bo dem, tren mot kho da day thi khong the.
         assertEquals(0, store.getDroppedByPageLimitCount());
     }
 }

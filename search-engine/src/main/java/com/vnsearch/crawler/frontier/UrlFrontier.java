@@ -24,6 +24,9 @@ public class UrlFrontier {
 
     private final Set<String> enqueued = new HashSet<>();
 
+    /** So URL dang cho trong frontier theo tung host — dung cho domainCount(). */
+    private final Map<String, Integer> pendingPerHost = new HashMap<>();
+
     private final Object lock = new Object();
     private final int maxSize;
 

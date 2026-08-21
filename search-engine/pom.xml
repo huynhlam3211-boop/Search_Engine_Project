@@ -28,6 +28,12 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Spring Boot 4 da chuyen sang Jackson 3 (tools.jackson.*).
+		     Crawler dung API Jackson 2 (com.fasterxml.jackson.databind) nen
+		     khai bao rieng, hai ban chay song song duoc vi khac package. -->
+		<jackson2.version>2.19.0</jackson2.version>
+		<jsoup.version>1.21.1</jsoup.version>
+		<testcontainers.version>1.21.3</testcontainers.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -40,6 +46,48 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- ============ Crawler ============ -->
+
+		<!-- Phan tich HTML: ContentParser, LinkExtractor, HtmlDownloader,
+		     UrlExtractorService, ImageDownloadService -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>${jsoup.version}</version>
+		</dependency>
+
+		<!-- Doc/ghi corpus JSON: ContentStorage, ImageStorage -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson2.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>${jackson2.version}</version>
+		</dependency>
+
+		<!-- So lieu: CrawlAnalyticsService, CrawlerService (SimpleMeterRegistry) -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+		</dependency>
+
+		<!-- Bus su kien qua Kafka: KafkaCrawlEventBus -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- Kafka that trong KafkaCrawlBusIT (chi chay khi goi *IT, khong chay o mvn test) -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>kafka</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -47,6 +95,47 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+
+			<!--
+			  TAM THOI: chi bien dich nhanh crawler.
+			  Cac package index/query/ranking/storage con la file rong, va
+			  auth/config/controller con dang viet do, nen ca module khong the
+			  compile. Gioi han pham vi de `run-crawl.bat` chay duoc ngay.
+			  BO <includes>/<testIncludes> khi cac phan con lai da xong.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<includes>
+						<include>com/vnsearch/crawler/**/*.java</include>
+						<include>com/vnsearch/datastructure/**/*.java</include>
+						<include>com/vnsearch/model/**/*.java</include>
+					</includes>
+					<testIncludes>
+						<testInclude>com/vnsearch/crawler/**/*.java</testInclude>
+						<!-- Chi cac cau truc du lieu ma crawler that su dung -->
+						<testInclude>com/vnsearch/datastructure/BloomFilterTest.java</testInclude>
+						<testInclude>com/vnsearch/datastructure/LRUCacheTest.java</testInclude>
+						<testInclude>com/vnsearch/datastructure/MinHeapTest.java</testInclude>
+					</testIncludes>
+					<testExcludes>
+						<!-- Can Docker (Testcontainers), khong chay o vong test thuong -->
+						<testExclude>**/KafkaCrawlBusIT.java</testExclude>
+					</testExcludes>
+				</configuration>
+			</plugin>
+
+			<!-- run-crawl.bat goi exec:java; ghim ban de khong phu thuoc ban moi nhat -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+				<configuration>
+					<mainClass>com.vnsearch.crawler.MultiDomainCrawlRunner</mainClass>
+					<classpathScope>runtime</classpathScope>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

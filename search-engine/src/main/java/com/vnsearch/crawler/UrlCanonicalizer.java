@@ -1,7 +1,7 @@
 package com.vnsearch.crawler;
 
 import java.net.URI;
-import java.uti.Locale;
+import java.util.Locale;
 
 public final class UrlCanonicalizer {
     private UrlCanonicalizer() {
@@ -28,7 +28,8 @@ public final class UrlCanonicalizer {
             StringBuilder sb = new StringBuilder(scheme).append("://").append(host);
 
             int port = uri.getPort();
-            boolean isDefaultPort = (port == 80 && scheme.equals("https")) || (port == 443 && scheme.equals("https"));
+            boolean isDefaultPort = (port == 80 && scheme.equals("http"))
+                    || (port == 443 && scheme.equals("https"));
             if (port > 0 && !isDefaultPort) {
                 sb.append(':').append(port);
             }
@@ -45,7 +46,7 @@ public final class UrlCanonicalizer {
 
             String query = uri.getRawQuery();
             if (query != null && !query.isEmpty()) {
-                sb.append(?).append(query);
+                sb.append('?').append(query);
             }
             return sb.toString();
 

@@ -12,10 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class LanguageFilter {
-    public static final String VIETNAMESE = "vi"
-    public static final String ENGLIST = "en"
-    public static final String UNDETERMINED = "und"
-    public static final String OTHER_LATIN = "other"
+    public static final String VIETNAMESE = "vi";
+    public static final String ENGLISH = "en";
+    public static final String UNDETERMINED = "und";
+    public static final String OTHER_LATIN = "other";
 
     private static final int SAMPLE_LIMIT = 20_000;
 
@@ -206,7 +206,7 @@ public class LanguageFilter {
 
     public long getAcceptedVietnameseCount() {
         return acceptedVietnamese.get();
-    
+    }
 
     public long getAcceptedEnglishCount() {
         return acceptedEnglish.get();
@@ -218,7 +218,7 @@ public class LanguageFilter {
 
     public long getRejectedCount() {
         return rejected.get();
-    
+    }
 
     public Map<String, Long> getRejectedByLanguage() {
         Map<String, Long> snapshot = new LinkedHashMap<>();

@@ -31,7 +31,7 @@ public final class ProgressBarCrawlListener implements CrawlListener {
     public ProgressBarCrawlListener(int everyN) {
         this.everyN = Math.max(1, everyN);
         this.interactive = detectInteractive();
-        this.unicode = stdoutCharset().newEncoder().canEncode("█░")
+        this.unicode = stdoutCharset().newEncoder().canEncode("█░");
         this.color = interactive && System.getenv("NO_COLOR") == null;
         this.startMs = System.currentTimeMillis();
     }

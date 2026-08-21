@@ -53,7 +53,8 @@ public class UrlFilter {
     }
 
     public UrlFilter(Set<String> allowedDomains, int maxDepth, Set<String> excludedHostPrefixes) {
-        this(allowedDomains, maxDepth, new RobotsTxtParser(), HtmlDowloader.USER_AGENT);
+        this(allowedDomains, maxDepth, excludedHostPrefixes,
+                new RobotsTxtParser(), HtmlDownloader.USER_AGENT);
     }
 
     public UrlFilter(Set<String> allowedDomains, int maxDepth,
@@ -109,6 +110,10 @@ public class UrlFilter {
 
         if (!isAllowedDomain(host)) {
             rejectedByDomain.incrementAndGet();
+            return false;
+        }
+        if (hasExcludedHostPrefix(host)) {
+            rejectedByHostPrefix.incrementAndGet();
             return false;
         }
         if (hasBlockedExtension(uri.getRawPath())) {
@@ -190,13 +195,18 @@ public class UrlFilter {
         return rejectedByExtension.get();
     }
 
+    public long getRejectedByHostPrefixCount() {
+        return rejectedByHostPrefix.get();
+    }
+
     public long getRejectedByRobotsCount() {
         return rejectedByRobots.get();
     }
 
     public long getTotalRejectedCount() {
         return rejectedByDepth.get() + rejectedByScheme.get() + rejectedByDomain.get()
-                + rejectedByExtension.get() + rejectedByRobots.get();
+                + rejectedByHostPrefix.get() + rejectedByExtension.get()
+                + rejectedByRobots.get();
     }
 
 

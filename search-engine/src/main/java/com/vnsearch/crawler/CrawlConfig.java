@@ -6,7 +6,7 @@ public class CrawlConfig {
     private final int maxPages;
     private final int threadCount;
     private final Set<String> allowedDomains;
-    private final Set<String> excludeHostPrefixes;
+    private final Set<String> excludedHostPrefixes;
     private final int maxDurationMinutes;
     private final String urlStoragePath;
 
@@ -15,7 +15,7 @@ public class CrawlConfig {
         this.maxPages = builder.maxPages;
         this.threadCount = builder.threadCount;
         this.allowedDomains = Set.copyOf(builder.allowedDomains);
-        this.excludeHostPrefixes = Set.copyOf(builder.excludeHostPrefixes);
+        this.excludedHostPrefixes = Set.copyOf(builder.excludedHostPrefixes);
         this.maxDurationMinutes = builder.maxDurationMinutes;
         this.urlStoragePath = builder.urlStoragePath;
     }
@@ -36,8 +36,8 @@ public class CrawlConfig {
         return threadCount;
     }
 
-    public Set<String> excludeHostPrefixes(){
-        return excludeHostPrefixes;
+    public Set<String> excludedHostPrefixes(){
+        return excludedHostPrefixes;
     }
 
     public Set<String> allowedDomains() {
@@ -64,7 +64,7 @@ public class CrawlConfig {
         private int maxPages = 100;
         private int threadCount = 4;
         private Set<String> allowedDomains = Set.of();
-        private Set<String> excludeHostPrefixes = Set.of();
+        private Set<String> excludedHostPrefixes = Set.of();
         private int maxDurationMinutes = 60;
         private String urlStoragePath = null;
 
@@ -91,7 +91,7 @@ public class CrawlConfig {
             return this;
         }
 
-        public Builder excludeHostPrefixes(Set<String> value) {
+        public Builder excludedHostPrefixes(Set<String> value) {
             this.excludedHostPrefixes = value == null ? Set.of() : value;
             return this;
         }

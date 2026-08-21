@@ -3,6 +3,20 @@ package com.vnsearch.crawler.bus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 
+/*
+*
+ * @param url           URL đã chuẩn hoá của trang
+ * @param host          host tách sẵn — cũng chính là <b>khoá phân hoạch</b> Kafka
+ * @param depth         độ sâu BFS tại thời điểm trang được tải
+ * @param title         tiêu đề do {@code ContentParser} bóc
+ * @param bodyText      văn bản thân bài, để Analytics đo mà không phải phân tích lại DOM
+ * @param language      mã ngôn ngữ do {@code LanguageFilter} kết luận
+ * @param html          HTML thô — nguồn dữ liệu của URL Extractor và Image Download
+ * @param contentHash   vân tay SHA-256 mà {@code ContentSeenFilter} đã tính
+ * @param crawledAt     thời điểm tải xong
+ * @param jobId         phiên crawl đã sinh ra trang này — xem phần dưới
+*/
+
 public record PageEvent(
         String url,
         String host,

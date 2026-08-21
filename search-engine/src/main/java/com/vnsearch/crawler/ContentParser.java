@@ -8,7 +8,7 @@ import java.time.Instant;
 
 public class ContentParser {
 
-    public WebDocument parse(String url, Documnet document) {
+    public WebDocument parse(String url, Document document) {
         WebDocument doc = new WebDocument();
         doc.setUrl(url);
         doc.setTitle(document.title());

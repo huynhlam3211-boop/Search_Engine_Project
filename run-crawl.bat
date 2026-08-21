@@ -20,6 +20,11 @@ if "%MAX_PAGES%"=="" set "MAX_PAGES=10000"
 if "%MAX_DEPTH%"=="" set "MAX_DEPTH=4"
 if "%OUTPUT%"==""    set "OUTPUT=data/crawled-documents.json"
 
+rem --- Kho anh: runner tu suy ra tu OUTPUT (ImageStorage.pathFor) ---
+set "IMAGES=%OUTPUT%"
+if /i "%IMAGES:~-5%"==".json" set "IMAGES=%IMAGES:~0,-5%"
+set "IMAGES=%IMAGES%.images.json"
+
 cd /d "%~dp0search-engine" 2>nul
 if errorlevel 1 (
     echo [LOI] Khong tim thay thu muc "%~dp0search-engine".
@@ -57,6 +62,7 @@ echo So trang toi da : %MAX_PAGES%
 echo Do sau toi da   : %MAX_DEPTH%
 echo Ngon ngu        : CHI tieng Viet va tieng Anh
 echo Tep dau ra      : %OUTPUT%
+echo Tep anh         : %IMAGES%
 
 rem --- Corpus cu: noi tiep hay xoa lam lai ---
 if /i "%FRESH%"=="--fresh" goto :ask_fresh
@@ -103,7 +109,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo Xong. Corpus da luu tai "%CD%\%OUTPUT%".
+echo Xong.
+echo   Corpus : "%CD%\%OUTPUT%"
+echo   Kho anh: "%CD%\%IMAGES%"
+echo.
+echo Xem thong ke corpus vua crawl:
+echo     crawl-stats.bat "search-engine/%OUTPUT%"
+echo.
 echo Muon ket qua vao bo tim kiem thi khoi dong lai backend, hoac goi:
 echo     curl -X POST http://localhost:8080/api/admin/reindex
 echo.

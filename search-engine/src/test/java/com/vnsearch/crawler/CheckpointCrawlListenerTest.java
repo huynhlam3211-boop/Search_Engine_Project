@@ -18,7 +18,7 @@ class CheckpointCrawlListenerTest {
 
     @Test
     @DisplayName("Corpus con nho: van ghi deu moi everyN trang")
-    void writesEveryNWhileCorpusIsSmall() {.
+    void writesEveryNWhileCorpusIsSmall() {
         assertTrue(CheckpointCrawlListener.isDueForCheckpoint(750, 500, EVERY_N));
         assertFalse(CheckpointCrawlListener.isDueForCheckpoint(700, 500, EVERY_N));
     }

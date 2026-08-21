@@ -2,11 +2,11 @@ package com.vnsearch.crawler.bus;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.stringframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-public class KafkaCrawlEventBus implement CrawlEventBus {
+public class KafkaCrawlEventBus implements CrawlEventBus {
     
     private static final Logger log = LoggerFactory.getLogger(KafkaCrawlEventBus.class);
 

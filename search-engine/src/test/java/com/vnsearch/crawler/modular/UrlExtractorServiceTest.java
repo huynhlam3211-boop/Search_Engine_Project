@@ -20,6 +20,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Modular Service 1 — chang {@code URL Extractor -> URL Filter -> URL Seen}.
+ *
+ * <p>Toan bo bai test chay KHONG can broker: service khong biet Kafka ton tai,
+ * dung nhu thiet ke. Do chinh la thu ma interface {@code PageEventHandler}
+ * mua duoc.
+ */
 class UrlExtractorServiceTest {
 
     private InProcessCrawlEventBus bus;
@@ -58,21 +65,28 @@ class UrlExtractorServiceTest {
 
         service().onPage(pageWith(html));
 
+        // Mot su kien outlinks cho ca trang
         assertEquals(1, outlinks.size());
         assertEquals(2, outlinks.get(0).size());
         assertEquals("https://a.com/bai", outlinks.get(0).sourceUrl());
 
+        // Hai URL rieng le di vao frontier
         assertEquals(2, discovered.size());
         assertTrue(discovered.stream().anyMatch(d -> d.url().equals("https://a.com/mot")));
         assertTrue(discovered.stream().anyMatch(d -> d.url().equals("https://a.com/hai")));
     }
 
+    /**
+     * Do sau tang dung MOT bac. Sai cho nay thi luat maxDepth hoac khong bao
+     * gio chan, hoac chan qua som — ca hai deu chi lo ra sau hang nghin trang.
+     */
     @Test
     void childDepthIsParentPlusOne() {
         service().onPage(pageWith("<a href='https://a.com/con'>con</a>"));
         assertEquals(3, discovered.get(0).depth(), "Trang o do sau 2 -> con o do sau 3");
     }
 
+    /** jobId phai di xuyen suot: trang -> lien ket -> frontier. */
     @Test
     void jobIdIsPropagatedToEveryDownstreamEvent() {
         service().onPage(pageWith("<a href='https://a.com/con'>con</a>"));
@@ -87,6 +101,11 @@ class UrlExtractorServiceTest {
         assertEquals("https://a.com/bai", discovered.get(0).sourceUrl());
     }
 
+    /**
+     * Lien ket tuong doi phai phan giai duoc. Neu baseUri khong duoc truyen
+     * vao Jsoup.parse thi absUrl tra ve chuoi rong va trang coi nhu khong co
+     * lien ket nao — crawler dung sau vai trang ma khong co loi nao duoc ghi.
+     */
     @Test
     void resolvesRelativeLinksAgainstThePageUrl() {
         service().onPage(pageWith("<a href='/muc/con'>con</a>"));
@@ -103,7 +122,8 @@ class UrlExtractorServiceTest {
         s.onPage(pageWith("<a href='https://b.com/ngoai'>ngoai</a>"));
         assertEquals(1, s.getRejectedByFilterCount());
     }
- 
+
+    /** URL da gap thi khong xep hang lai — nhung VAN nam trong outlinks. */
     @Test
     void alreadySeenUrlIsNotQueuedButStaysInOutlinks() {
         UrlExtractorService s = service();
@@ -112,14 +132,21 @@ class UrlExtractorServiceTest {
         s.onPage(pageWith(html));
         assertEquals(1, discovered.size());
 
-        s.onPage(pageWith(html)); 
+        s.onPage(pageWith(html)); // lan hai: URL da gap
         assertEquals(1, discovered.size(), "Khong duoc xep hang lai");
         assertEquals(1, s.getRejectedAsSeenCount());
 
+        // Nhung outlinks van day du — day la du lieu cho PageRank, khong duoc loc
         assertEquals(2, outlinks.size());
         assertEquals(1, outlinks.get(1).size());
     }
 
+    /**
+     * Day la bat bien quan trong nhat cua thiet ke: tap outlinks (cho PageRank)
+     * KHAC tap URL vao frontier (cho vong lap crawl). Gop lam mot thi do thi
+     * lien ket mat gan het canh noi bo va PageRank thanh mot cot so vo nghia
+     * ma van chay trot lot.
+     */
     @Test
     void outlinksKeepEverythingEvenWhatTheFilterRejects() {
         service().onPage(pageWith("""
@@ -156,6 +183,11 @@ class UrlExtractorServiceTest {
         assertEquals(1.5, s.getAverageOutlinksPerPage(), 0.001);
     }
 
+    /**
+     * Supplier chu khong phai tham chieu co dinh: CrawlerService cap phat lai
+     * bo loc cho TUNG phien crawl. Giu tham chieu co dinh thi phien thu hai
+     * loc theo domain cua phien thu nhat.
+     */
     @Test
     void seesTheCurrentFilterNotTheOneAtConstructionTime() {
         UrlExtractorService s = service();
@@ -163,6 +195,7 @@ class UrlExtractorServiceTest {
         s.onPage(pageWith("<a href='https://b.com/x'>x</a>"));
         assertEquals(0, discovered.size(), "b.com bi loai boi bo loc phien 1");
 
+        // "Phien 2": doi bo loc, service phai thay ngay
         filter = new UrlFilter(Set.of("b.com"), 5);
         seen = UrlSeenFilter.forMaxPages(1000);
         s.onPage(pageWith("<a href='https://b.com/x'>x</a>"));
@@ -187,6 +220,7 @@ class UrlExtractorServiceTest {
                 () -> new UrlExtractorService(new LinkExtractor(), () -> filter, () -> seen, null));
     }
 
+    /** Lien ket tro ve chinh trang dang xet phai bi LinkExtractor loai. */
     @Test
     void selfLinkIsNotQueued() {
         service().onPage(pageWith("<a href='https://a.com/bai'>chinh no</a>"));

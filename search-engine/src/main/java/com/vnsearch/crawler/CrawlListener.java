@@ -10,6 +10,10 @@ public interface CrawlListener {
     default void onDuplicateContent(String url) {
     }
 
+    /** Trang bi Language Filter loai vi khong phai tieng Viet hay tieng Anh. */
+    default void onForeignLanguage(String url, String language) {
+    }
+
     default void onFinished(int totalPages , long elapsedMs) {
     }
 

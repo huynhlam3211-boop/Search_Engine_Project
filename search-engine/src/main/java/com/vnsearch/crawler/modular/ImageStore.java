@@ -55,13 +55,13 @@ public class ImageStore{
         return image == null ? List.of() : List.of(image);
     }
 
-    public List<ImageFound> forPages(List<String> pagesUrls, int limit) {
+    public List<ImageFound> forPages(List<String> pageUrls, int limit) {
         List<ImageFound> out = new ArrayList<>();
         if (pageUrls == null || limit <=0) {
             return out;
         }
         Set<String> seen = new java.util.HashSet<>();
-        for (String pagesUrl : pageUrls) {
+        for (String pageUrl : pageUrls) {
             if (out.size() >= limit) {
                 return out;
             }
@@ -74,8 +74,13 @@ public class ImageStore{
     }
     
 
+    /** So anh dang giu — moi trang giu dung mot anh dai dien. */
+    public int imageCount() {
+        return byPage.size();
+    }
+
     public List<ImageFound> all() {
-        return new ArrayList<>(byPage.value());
+        return new ArrayList<>(byPage.values());
     }
 
     public int addAll(Collection<ImageFound> images) {

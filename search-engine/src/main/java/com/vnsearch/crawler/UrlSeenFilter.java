@@ -7,7 +7,7 @@ public class UrlSeenFilter {
     public static final int URLS_SEEN_PER_PAGE = 200;
 
     public static final int MIN_EXPECTED_URLS = 200000;
-    public static final int MAX_EXPECTED_URL = 50_000_000;
+    public static final int MAX_EXPECTED_URLS = 50_000_000;
 
     private static final double FALSE_POSITIVE_RATE = 0.01;
 
@@ -32,17 +32,6 @@ public class UrlSeenFilter {
         this.urlStorage = urlStorage == null ? UrlStorage.disabled() : urlStorage;
     }
 
-    
-    public long replayedFromStorage() {
-        return urlStorage.replay( url -> {
-            synchronized (lock) {
-                if (!bloomFilter.mightContain(url)) {
-                    bloomFilter.add(url);
-                    seenCount++;
-                }
-            }
-        });
-    }
 
     public boolean markSeenIfNew(String url) {
         if (url == null || url.isBlank()) {

@@ -115,7 +115,6 @@ class CrawlerServiceBusWiringTest {
         assertEquals(0, crawler.getOrphanOutlinksCount());
     }
 
-     */
     @Test
     void contentStorageAcceptsOutlinksAfterTheDocumentIsSaved() {
         ContentStorage storage = new ContentStorage();
