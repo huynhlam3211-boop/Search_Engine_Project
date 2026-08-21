@@ -9,10 +9,15 @@ public class UrlFilter {
 
 
     private static final Set<String> BLOCKED_EXTENSIONS = Set.of(
+        // img
         "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tif", "tiff",
+        // tài liệu tĩnh 
         "css", "js", "json", "xml", "rss", "atom", "woff", "woff2", "ttf", "eot",
+        // tài liệu
         "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "csv",
+        // nén và cài đặt
         "zip", "rar", "7z", "tar", "gz", "bz2", "exe", "msi", "apk", "dmg", "iso",
+        // đa phương tiện
         "mp3", "mp4", "avi", "mkv", "mov", "wmv", "flv", "wav", "m4a", "webm");
 
     public static final Set<String> NON_VI_EN_HOST_PREFIXES = Set.of(
