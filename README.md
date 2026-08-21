@@ -1,359 +1,372 @@
-# Browser app like CocCoc and Vietnamese search engine
+# VnSearch Crawler
 
-A Vietnamese search engine built from scratch — crawler, inverted index, ranking,
-and a mini browser to query it.
+Web crawler đa luồng, đa domain cho tiếng Việt và tiếng Anh. Đầu ra là một corpus
+JSON (văn bản + đồ thị liên kết + ảnh đại diện mỗi trang) dùng làm đầu vào cho
+phần đánh chỉ mục và tìm kiếm.
 
-Every core data structure and algorithm is **hand-written**, with no off-the-shelf
-search library: inverted index, VByte compression, PageRank, Trie, Bloom filter,
-MinHeap, and a Vietnamese word segmenter.
+> **Phạm vi của README này và của nhánh hiện tại.** Chỉ phần crawler được biên
+> dịch. `pom.xml` giới hạn `maven-compiler-plugin` vào ba package:
+> `com/vnsearch/crawler/**`, `com/vnsearch/datastructure/**`, `com/vnsearch/model/**`.
+> Các package `index`, `query`, `ranking`, `storage`, `auth`, `config`,
+> `controller`, `service` còn là file rỗng hoặc đang viết dở nên không nằm trong
+> phạm vi build. Bỏ hai thẻ `<includes>` / `<testIncludes>` khi các phần đó xong.
 
-```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   Crawler    │───▶│    Index     │───▶│   Ranking    │───▶│   REST API   │
-│              │    │              │    │              │    │              │
-│ UrlFrontier  │    │ InvertedIndex│    │ TF-IDF/BM25  │    │ /api/search  │
-│ BloomFilter  │    │ VByte + delta│    │ PageRank     │    │ /api/suggest │
-│ robots.txt   │    │ VN segmenter │    │ MinHeap top-K│    │ /api/admin   │
-└──────────────┘    └──────────────┘    └──────────────┘    └──────┬───────┘
-                                                                    │
-                                                            ┌───────▼───────┐
-                        ┌──────────────────┐                │  browser-app  │
-                        │ football-service │───────────────▶│  (Electron)   │
-                        │   (Go, :8090)    │  Sports panel  └───────────────┘
-                        └──────────────────┘
-```
+- **Java**: 21 (`maven.compiler.release=21`)
+- **Phụ thuộc chính**: jsoup (tải + phân tích HTML), Jackson (JSON), Micrometer
+  (số liệu), Spring Kafka (chỉ dùng cho chế độ nhiều tiến trình)
+- **Trạng thái test**: `272 tests, 0 failures` (`mvnw test`)
 
 ---
 
-## Quick start — Docker
+## 1. Chạy nhanh
 
-Requires Docker Desktop.
+Từ thư mục gốc repo (Windows):
 
-```bash
-# 1. Create your config file from the template
-cp .env.example .env
-
-# 2. Generate an admin key and paste it into .env
-openssl rand -hex 32
-#   PowerShell: -join ((1..64) | % { '{0:x}' -f (Get-Random -Max 16) })
-
-# 3. Run
-docker compose up -d --build
+```bat
+run-crawl.bat [maxPages] [maxDepth] [output] [--fresh]
 ```
 
-The backend serves on `http://localhost:8080`. First boot takes a few tens of
-seconds to build the index — follow it with `docker compose logs -f backend`.
+Mặc định của `run-crawl.bat`: `10000` trang, độ sâu `4`, ghi ra
+`data/crawled-documents.json` (đường dẫn tương đối với `search-engine/`).
 
-```bash
-curl "http://localhost:8080/api/health"
-curl "http://localhost:8080/api/search?q=máy+tính&size=3"
+```bat
+rem crawl mới hoặc NỐI TIẾP corpus sẵn có tại đường dẫn output
+run-crawl.bat 5000 3 data/crawled-documents.json
+
+rem xoá corpus cũ và crawl lại từ đầu (script hỏi xác nhận, phải gõ XOA)
+run-crawl.bat 5000 3 data/crawled-documents.json --fresh
 ```
 
-> **If `docker compose up` stops immediately with "Thieu ADMIN_API_KEY"** — that
-> is deliberate, not a bug. Step 2 above has not been done.
-> See [Why the admin key is mandatory](#why-the-admin-key-is-mandatory).
-
-### Optional profiles
-
-The default stack is deliberately the lightest thing that still works. Two
-opt-in profiles add the distributed crawl pipeline and the observability chain:
+Không dùng file `.bat` thì gọi thẳng runner:
 
 ```bash
-# + Kafka, kafka-ui, a separate crawler-worker process   (~3 GB RAM)
-docker compose --profile kafka up -d --build
-
-# + Prometheus, Grafana, Alertmanager, kafka-exporter    (~4 GB RAM)
-docker compose --profile kafka --profile monitoring up -d --build
-
-# + football-service (Go), feeding the browser's Sports panel   (~30 MB RAM)
-docker compose --profile football up -d --build
-```
-
-| Address | What you get |
-|---|---|
-| <http://localhost:8081> | kafka-ui — topics, partitions, consumer lag, dead-letter messages |
-| <http://localhost:3000> | Grafana (`admin`/`admin`), dashboard pre-provisioned |
-| <http://localhost:9090/alerts> | Prometheus — the 7 alert rules and their state |
-| <http://localhost:9093> | Alertmanager |
-| <http://localhost:8090/api/v1/status> | football-service — daily API budget left |
-
-Details: [`docs/DEVOPS.md`](docs/DEVOPS.md).
-
----
-
-## Running without Docker
-
-Requires JDK 17+ and Node.js 22+.
-
-### Backend
-
-```bash
-run-backend.bat             # Windows
-
-# or, by hand:
-export ADMIN_API_KEY=$(openssl rand -hex 32)          # Linux/macOS
-$env:ADMIN_API_KEY = "..."                             # PowerShell
 cd search-engine
-./mvnw spring-boot:run
+./mvnw -q compile exec:java \
+  -Dexec.mainClass=com.vnsearch.crawler.MultiDomainCrawlRunner \
+  -Dexec.args="5000 3 data/crawled-documents.json"
 ```
 
-`run-backend.bat` reads `ADMIN_API_KEY` from `.env` (generating and saving one
-if absent), checks port 8080, sets a 6 GB heap, and warns when `data/index.json`
-is older than the crawled corpus. Flags: `--postgres`, `--kafka`, `--bm25`,
-`--help`.
+Tham số của `MultiDomainCrawlRunner`: `[maxPages=5000] [maxDepth=3]
+[output=data/crawled-multi.json] [--fresh]`.
 
-No database required: the app falls back to the sample corpus shipped with the
-repo (`data/seed-documents.json`), so a fresh clone runs as-is.
+Xem thống kê corpus vừa crawl:
 
-### Frontend
-
-```bash
-run-frontend.bat            # Windows
-# or: cd browser-app && npm install && npm run dev
+```bat
+crawl-stats.bat "search-engine/data/crawled-documents.json"
 ```
 
-### Crawling your own corpus
+Ctrl+C giữa chừng vẫn an toàn: checkpoint được ghi mỗi 250 trang vào đúng tệp
+đầu ra, và lần chạy sau tự nối tiếp từ đó.
 
-```bash
-run-crawl.bat 5000 3        # 5,000 pages, depth 3
-```
+### Biến môi trường / system property
+
+| Tên | Giá trị | Tác dụng |
+| --- | --- | --- |
+| `CRAWL_PROGRESS` | `bar` (mặc định) | Ép hiển thị thanh tiến độ; giá trị khác thì in từng dòng |
+| `-Dcrawl.progress` | `bar` | Như trên, dạng system property |
+| `NO_COLOR` | có đặt | Tắt màu ANSI trên thanh tiến độ |
 
 ---
 
-## Kubernetes
+## 2. Kiến trúc
 
-A three-node [kind](https://kind.sigs.k8s.io/) cluster, ingress, and the full
-stack in one command:
+Mỗi khối trong sơ đồ là **một lớp riêng**; `CrawlerService` chỉ nối chúng lại và
+không tự làm việc gì.
 
-```bash
-bash deploy/kind/up.sh
-# then add to your hosts file:  127.0.0.1 vnsearch.local
-curl http://vnsearch.local/api/health
+```
+   seed URLs
+       |
+       v
+   URL Frontier -> HTML Downloader -> Content Parser -> Language Filter -> Content Seen? -(Yes)-> vứt
+       ^                 |                            (không vi/en) vứt        |
+       |                 v                                                     | (No)
+       |           DNS Resolver                                                v
+       |                                                              Content Storage
+       |                                                                       |
+       |                                                                       v
+       |                                                                Link Extractor
+       |                                                                       |
+       |                                                                       v
+       |                                                                  URL Filter
+       |                                                                       |
+       |                                                                       v
+       +----------------------------- (No) ---------------------------- URL Seen?  <-->  URL Storage
+                                                                               |
+                                                                            (Yes) vứt
 ```
 
-Manifests use Kustomize with a shared base and two overlays:
+| Khối trong sơ đồ | Lớp cài đặt |
+| --- | --- |
+| URL Frontier | `crawler.frontier.UrlFrontier` (+ `FrontQueues`, `BackQueues`, `DefaultPrioritizer`) |
+| DNS Resolver | `crawler.DnsResolver` (LRU cache) |
+| HTML Downloader | `crawler.HtmlDownloader` (jsoup + retry + chặn SSRF) |
+| Content Parser | `crawler.ContentParser` |
+| Language Filter | `crawler.LanguageFilter` |
+| Content Seen? | `crawler.ContentSeenFilter` (SHA-256) |
+| Content Storage | `crawler.ContentStorage` |
+| Link Extractor | `crawler.LinkExtractor` (+ `UrlCanonicalizer`) |
+| URL Filter | `crawler.UrlFilter` (+ `RobotsTxtParser`) |
+| URL Seen? | `crawler.UrlSeenFilter` (Bloom filter) |
+| URL Storage | `crawler.UrlStorage` (append-only, replay được) |
 
-| | `overlays/dev` | `overlays/prod` |
-|---|---|---|
-| Replicas | 1 | 3, spread across nodes |
-| Autoscaling | off (no metrics-server in kind) | HPA, 2–6 pods at 70% CPU |
-| Secrets | placeholder file in Git | created out-of-band, never committed |
-| Image | local build, `kind load` | pinned tag from GHCR |
-| Scorer | `tfidf` | `bm25` |
+**Thứ tự các khối không tuỳ tiện:**
 
-The backend runs as non-root with a read-only root filesystem under a
-`restricted` Pod Security namespace, has startup/readiness/liveness probes, a
-PodDisruptionBudget, and a NetworkPolicy restricting Postgres to backend pods
-only.
-
-```bash
-kubectl apply -k deploy/k8s/overlays/dev     # or overlays/prod
-bash deploy/kind/down.sh                     # tear the cluster down
-```
+- `Content Seen?` đứng **trước** `Link Extractor` → trang trùng nội dung bị vứt
+  mà không tốn công bóc liên kết.
+- `URL Filter` đứng **trước** `URL Seen?` → các luật rẻ (độ sâu, domain, đuôi
+  tệp) chạy trước phép tra Bloom filter.
+- `Language Filter` đứng ngay sau `Content Parser` → trang ngoại ngữ không bị
+  bóc liên kết, nên crawler không đi sâu vào vùng ngoại ngữ rồi vứt tiếp.
 
 ---
 
-## API
+## 3. URL Frontier
 
-23 endpoints. The middle column is the *role* required, not the mechanism.
+Hai tầng hàng đợi (mô hình Mercator), `UrlFrontier` khoá toàn cục trên một
+`lock`:
 
-| Endpoint | Access | Description |
-|---|:---:|---|
-| `GET /api/search?q=&page=&size=` | — | Search |
-| `GET /api/suggest?prefix=&limit=` | — | Prefix suggestions (Trie). Note: `prefix`, **not** `q` |
-| `GET /api/images?q=&page=&size=` | — | Image search, backed by `ImageStore` |
-| `GET /api/feed?seed=&page=&size=` | — | Browse the index without a query. Same `seed` ⇒ same order, so pages join up |
-| `GET /api/health` | — | Liveness. Returns `503` when the index is empty |
-| `GET /actuator/prometheus` | — | Prometheus metrics |
-| `POST /api/events` | — | Write side of usage analytics — deliberately open |
-| `POST /api/auth/register` | — | Always creates a `USER`; there is no way to self-assign `ADMIN` |
-| `POST /api/auth/login` | — | Returns an opaque 256-bit token, valid 12 hours |
-| `POST /api/auth/logout` | — | Revokes the token immediately; open so an *expired* token can still log out |
-| `GET /api/auth/me` | 🔑 | Who am I |
-| `POST /api/auth/password` | 🔑 | Requires the current password even with a valid token |
-| `POST /api/auth/logout-all` | 🔑 | Revokes every session of this account |
-| `POST /api/admin/crawl` | 👑 | Start a crawl job |
-| `GET /api/admin/crawl/{id}/status` | 👑 | Crawl job status |
-| `POST /api/admin/reindex` | 👑 | Rebuild the index |
-| `GET /api/admin/stats` | 👑 | Detailed statistics |
-| `GET /api/admin/analytics` | 👑 | One JSON with traffic, crawl, index and account figures |
-| `POST /api/admin/analytics/reset` | 👑 | Clears traffic figures only — never touches the index |
-| `GET /api/admin/users` | 👑 | Never includes password hashes |
-| `POST /api/admin/users/{name}/role` | 👑 | Also closes every session of that user |
-| `POST /api/admin/users/{name}/disable` · `/enable` | 👑 | Keeps the data, blocks login |
-| `DELETE /api/admin/users/{name}` | 👑 | `400` if you try to delete yourself |
+**Front queues — quyết định *ưu tiên*.** `DefaultPrioritizer` chia URL vào 5 mức
+(0 = cao nhất): mức khởi điểm là độ sâu BFS, `-1` nếu host kết thúc bằng `.vn`,
+`-1` nữa nếu URL có ≥ 5 backlink đã biết. Seed vào với điểm backlink 10, liên
+kết bóc được vào với 1.
 
-🔑 = signed in · 👑 = `ADMIN`
+`WeightedRandomSelector` (mặc định) chọn mức theo trọng số `2^(levels-1-level)`,
+tức mức 0 có xác suất gấp đôi mức 1, gấp 16 lần mức 4 — mức thấp vẫn được phục
+vụ chứ không chết đói. `StrictPrioritySelector` là bản luôn lấy mức cao nhất còn
+URL, dùng khi cần thứ tự tất định trong test.
 
-**Two ways to authenticate, one authorisation table.** Tools use a static
-`X-API-Key` (no identity, never expires, always full `ADMIN`); people use an
-account and get `Authorization: Bearer` (identity, 12-hour expiry, revocable
-instantly). Both feed the *same* role check in `SecurityConfig` — adding OAuth
-later means adding a filter, not editing the table.
+**Back queues — quyết định *lịch sự*.** 128 hàng đợi, mỗi hàng gắn với đúng một
+host (`Mapping Table` là `hostToQueue`), giãn cách **1000 ms/host**. `MinHeap`
+sắp các hàng đợi theo thời điểm sẵn sàng, nên `poll()` luôn lấy được host đến
+lượt sớm nhất mà không phải quét toàn bộ. Hàng đợi cạn thì được trả về danh sách
+slot trống và gắn cho host khác.
+
+Sức chứa mặc định 500.000 URL; vượt trần thì URL mới bị bỏ và đếm vào
+`droppedDueToCapacity`.
+
+---
+
+## 4. Chống trùng ở hai mức
+
+| | Chặn gì | Cấu trúc | Chi phí |
+| --- | --- | --- | --- |
+| `UrlSeenFilter` | tải lại cùng một **địa chỉ** | Bloom filter, FP rate 1% | ~200 URL/trang × maxPages bit (tối thiểu 200k, tối đa 50M phần tử) |
+| `ContentSeenFilter` | lưu lại cùng một **nội dung** dưới hai URL | `ConcurrentHashMap` vân tay SHA-256 | 1 lần băm/trang |
+
+Thiếu mức thứ hai thì các bản sao cùng lọt vào chỉ mục và cùng hiện trong một
+trang kết quả. Vân tay được tính sau khi chuẩn hoá (hạ chữ thường, gộp khoảng
+trắng), nên bản sao chỉ khác định dạng vẫn bị bắt.
+
+`UrlSeenFilter` ghi kèm mọi URL đã gặp xuống `UrlStorage` khi
+`CrawlConfig.urlStoragePath` được đặt, và `replayFromStorage()` nạp lại được.
+**Lưu ý:** không dùng tệp này để nối tiếp phiên crawl — nó chứa cả hàng chục
+nghìn URL còn nằm trong frontier lúc dừng, nạp lại sẽ đánh dấu chúng "đã gặp" và
+khoá vĩnh viễn phần lớn không gian còn lại. Việc nối tiếp đi qua corpus (xem §8).
+
+---
+
+## 5. An toàn
+
+**Chặn SSRF ở hai tầng.** `SeedUrlValidator` chặn ở tầng nhập seed;
+`HtmlDownloader.ensureTargetAllowed()` chặn lại một lần nữa ngay trước khi mở kết
+nối, vì URL đến từ outlink của trang đã crawl không đi qua tầng kia. Bị chặn:
+
+- scheme khác `http`/`https`
+- hostname trong danh sách chặn: `localhost`, `*.localhost`, `metadata`,
+  `metadata.google.internal`, `instance-data`, `169.254.169.254`
+- địa chỉ phân giải ra loopback, link-local (`169.254/16`, `fe80::/10`),
+  site-local (`10/8`, `172.16/12`, `192.168/16`), any-local, multicast,
+  unique-local IPv6 (`fc00::/7`), carrier-grade NAT (`100.64/10`)
+
+URL bị chặn ném `BlockedTargetException` — là `IOException` để gọi bên ngoài bắt
+chung với lỗi mạng, nhưng là lớp riêng để `download()` biết mà **không** thử lại.
+`ImageDownloadService` chạy đúng bộ kiểm tra này trước mỗi lần tải ảnh.
+
+**robots.txt.** `RobotsTxtParser` tải và cache `robots.txt` theo domain, áp luật
+"longest match wins" (Allow thắng khi dài bằng nhau, theo chuẩn Google). Được gọi
+trong `workerLoop` — tức *sau* khi lấy URL ra khỏi frontier, vì đây là luật đắt
+(có thể phải đi mạng), các luật rẻ đã chạy từ lúc xếp hàng.
+
+**User-Agent**: `VnSearchBot`. Timeout 10 s, tối đa 2 lần thử lại.
+
+---
+
+## 6. Lọc URL và lọc ngôn ngữ
+
+`UrlFilter` loại URL theo, và **đếm riêng từng lý do**: độ sâu > maxDepth,
+scheme không phải http(s), host ngoài `allowedDomains`, host bắt đầu bằng tiền tố
+ngoại ngữ (`cn.`, `ja.`, `ko.`, `ru.`, `fr.`, `de.`, `th.`, …), đuôi tệp nằm
+trong danh sách chặn (ảnh, css/js, pdf/office, nén, đa phương tiện), robots.txt.
+
+`LanguageFilter` chỉ giữ tiếng Việt, tiếng Anh và "chưa xác định", quyết định
+theo ba tầng bằng chứng trên 20.000 ký tự đầu (tiêu đề ghép với thân bài):
+
+1. **Hệ chữ viết** — ≥ 10% chữ cái thuộc Han/Hiragana/Hangul/Cyrillic/Arabic/…
+   thì kết luận ngay là ngoại ngữ (và ghi nhận mã ngôn ngữ tương ứng để thống kê).
+2. **Ký tự riêng của tiếng Việt** (`ơ ư ă đ`) ≥ 0,5% → tiếng Việt.
+3. **Từ chức năng** — ≥ 5% token là từ chức năng tiếng Việt → `vi`; ≥ 12% từ
+   chức năng tiếng Anh → `en` (nới xuống 5% nếu `<html lang>` cũng khai tiếng Anh).
+
+Dưới 40 token thì văn bản quá ngắn để kết luận, rơi về giá trị `<html lang>` /
+`og:locale` do `ContentParser` bóc được.
+
+---
+
+## 7. Event bus và ba Modular Service
+
+Sau khi lưu trang, `CrawlerService` **phát một `PageEvent` lên bus rồi quên đi**.
+Ba service phía sau tự lấy phần của mình:
+
+| Service | Nhận | Làm gì |
+| --- | --- | --- |
+| `UrlExtractorService` | `PageEvent` | Bóc liên kết → `UrlFilter` → `UrlSeenFilter` → phát `DiscoveredUrl` về frontier; phát `OutlinksExtracted` để ghi đồ thị liên kết vào tài liệu |
+| `ImageDownloadService` | `PageEvent` | Bóc `<img>` (`data-src`/`data-original`/`src`), tối đa 50 ảnh/trang, phát `ImageFound`; tuỳ chọn tải thật (mặc định **tắt**, trần 5 MB/ảnh) |
+| `CrawlAnalyticsService` | `PageEvent`, `ImageFound` | Đẩy số liệu vào Micrometer: kích thước HTML, độ dài thân bài, số ảnh/trang, số trang theo ngôn ngữ, số host phân biệt (trần 10.000), độ sâu lớn nhất |
+
+Hai bản cài của bus:
+
+- **`InProcessCrawlEventBus`** (mặc định) — publish là lời gọi hàm đồng bộ.
+  `CrawlerService()` tự dựng bus và tự đăng ký ba service, nên
+  `MultiDomainCrawlRunner` và toàn bộ test chạy được mà không cần hạ tầng gì.
+- **`KafkaCrawlEventBus`** — bốn topic (`pages`, `urls`, `outlinks`, `images`),
+  **khoá phân hoạch là `host`** để mọi trang cùng host rơi vào cùng partition.
+  Bật bằng `app.crawler.bus=kafka`. Khi bus được tiêm từ ngoài, `CrawlerService`
+  **không** đăng ký service cục bộ — chúng chạy ở tiến trình khác.
+
+`ImageStore` giữ **một ảnh tốt nhất mỗi trang**: `ImageQuality` xếp ảnh theo bậc
+(có kích thước ≥ 200px > không rõ kích thước > nhỏ > trang trí), rồi theo chiều
+rộng ước lượng (thuộc tính `width`, tham số `?w=`/`?width=`, hoặc `_800x600_`
+trong đường dẫn), rồi ưu tiên ảnh có `alt`. Ảnh `svg/gif/ico/bmp` và ảnh có
+`thumb|icon|logo|avatar|sprite|banner|favicon|1x1|…` trong đường dẫn bị xếp bậc
+thấp nhất.
+
+---
+
+## 8. Nối tiếp corpus và checkpoint
+
+`crawl(seeds, config, previousDocuments)` chạy **nối tiếp**: giữ nguyên tài liệu
+cũ, không tải lại chúng, và đi tiếp từ chính outlinks của chúng. Corpus cũ được
+đưa trở lại đúng ba khối, mỗi khối một lý do:
+
+- `ContentStorage` — để tệp ghi ra cuối phiên là corpus **tổng**, không phải chỉ
+  phần mới (thiếu bước này thì "nối tiếp" thực chất là ghi đè).
+- `UrlSeenFilter` — chặn tải lại trang đã có.
+- `ContentSeenFilter` — giữ vân tay cũ, để một trang cũ xuất hiện lại dưới URL
+  khác không thành bản sao thứ hai.
+
+Độ sâu của mọi liên kết cũ đặt lại về 1: độ sâu là thuộc tính của *đường đi*
+trong một phiên, không phải của trang. Hệ quả cần biết — mỗi lần chạy nối tiếp,
+corpus lan rộng thêm `maxDepth` tầng nữa.
+
+`CheckpointCrawlListener` ghi corpus + kho ảnh ra đúng tệp đầu ra sau mỗi 250
+trang (và không sớm hơn mức tăng 25% so với checkpoint trước), ghi trên một
+thread daemon riêng, bỏ qua lượt ghi nếu lượt trước chưa xong. `ContentStorage`
+ghi qua tệp `.tmp` rồi `ATOMIC_MOVE`, nên checkpoint không bao giờ để lại tệp
+JSON dở dang.
+
+---
+
+## 9. Cấu hình
+
+`CrawlConfig` là bất biến, dựng bằng builder, mọi phép kiểm tra tập trung trong
+`build()`:
+
+| Trường | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `maxDepth` | 3 | Độ sâu BFS tối đa |
+| `maxPages` | 100 | Trần số trang **lưu được** (không phải số trang tải) |
+| `threadCount` | 4 | Số worker thread |
+| `allowedDomains` | rỗng = không giới hạn | Khớp cả subdomain (`endsWith("." + d)`) |
+| `excludedHostPrefixes` | rỗng | Tiền tố host bị loại, ví dụ `UrlFilter.NON_VI_EN_HOST_PREFIXES` |
+| `maxDurationMinutes` | 60 | Trần thời gian cả phiên |
+| `urlStoragePath` | `null` = tắt | Tệp ghi mọi URL đã gặp |
+
+`MultiDomainCrawlRunner` dựng sẵn cấu hình cho 19 seed (11 tiếng Việt + 8 tiếng
+Anh: vnexpress, tuoitre, dantri, thanhnien, vietnamnet, nhandan, baochinhphu,
+vietnamplus, vietnamnews, vov, vir…), `allowedDomains` suy ra từ seed sau khi bỏ
+nhãn ngôn ngữ (`e.`/`en.`/`www.`), `threadCount = min(32, 2 × số host)`,
+`maxDurationMinutes = 180`.
+
+---
+
+## 10. Đầu ra
+
+`data/crawled-documents.json` — mảng `WebDocument`:
+
+```json
+[
+  {
+    "docId": 0,
+    "url": "https://vnexpress.net/bai-viet",
+    "title": "…",
+    "metaDescription": "…",
+    "bodyText": "…",
+    "outlinks": ["https://vnexpress.net/bai-khac", "…"],
+    "crawledAt": "2026-08-21T09:57:03.412Z",
+    "language": "vi"
+  }
+]
+```
+
+`docId` được cấp **sau** khi lưu thành công, từ một bộ đếm riêng, nên dãy luôn
+đặc `0..n-1` kể cả khi nhiều worker cùng về đích hoặc phiên nối tiếp cấp tiếp từ
+mốc corpus cũ.
+
+`data/crawled-documents.images.json` — mảng `ImageFound` (`pageUrl`, `host`,
+`imageUrl`, `altText`, `declaredWidth/Height`, `sizeBytes`, `contentHash`);
+đường dẫn suy ra từ tệp corpus bằng `ImageStorage.pathFor()`.
+
+`bodyText` đã loại `script, style, noscript, nav, footer, header, iframe, svg`.
+URL trong `outlinks` đã chuẩn hoá: bỏ fragment, hạ chữ thường scheme/host, bỏ
+cổng mặc định, bỏ dấu `/` thừa cuối đường dẫn, giữ nguyên query.
+
+---
+
+## 11. Số liệu cuối phiên
+
+`MultiDomainCrawlRunner` in báo cáo theo **từng khối**, lấy từ bộ đếm của chính
+các lớp đó:
+
+```
+=== THONG KE THEO TUNG KHOI ===
+DNS Resolver   : n host trong cache, ty le trung x%, n host chet bi loai som
+HTML Downloader: tai n trang, n lan thu lai, n that bai
+Language Filter: GIU n vi + n en + n chua ro, VUT n ngoai ngu  (zh n | ja n | …)
+Content Seen?  : n noi dung phan biet, VUT n ban trung, n trang than bai rong
+URL Filter     : nhan n, loai n  (domain n | duoi tep n | do sau n | scheme n | robots n)
+URL Seen?      : n URL phan biet, bo loc n bit (x KB), n ham bam
+URL Storage    : …
+```
+
+Rồi thống kê corpus: tổng trang, thời gian, thông lượng trang/giây, tổng outlink,
+phân bố theo domain và theo ngôn ngữ, số cạnh đồ thị (nội bộ / chéo domain), tỉ
+lệ thưa `nnz/n²`, và cảnh báo domain nào không crawl được trang nào.
+
+`crawl-stats.bat` đọc lại tệp JSON và in sâu hơn: phân vị số outlink mỗi trang,
+tỉ lệ URL trùng lặp, chặn trên của hàng đợi còn lại, hệ số nhân của frontier
+(> 1 nghĩa là hàng đợi không bao giờ cạn), và báo cáo kho ảnh.
+
+---
+
+## 12. Test
 
 ```bash
-curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:8080/api/admin/stats
-curl -H "Authorization: Bearer $TOKEN"  http://localhost:8080/api/auth/me
+cd search-engine
+./mvnw test
 ```
 
-The first admin account is created at boot from `BOOTSTRAP_ADMIN_PASSWORD` —
-there is no default password, on purpose. See
-[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) §3b.
+272 test, tất cả đều pass. Phạm vi: toàn bộ `com/vnsearch/crawler/**` cộng ba bộ
+test cấu trúc dữ liệu mà crawler thật sự dùng (`BloomFilterTest`, `LRUCacheTest`,
+`MinHeapTest`).
 
-Full examples: [`docs/api-examples.http`](docs/api-examples.http)
+Đáng chú ý: `SsrfProtectionTest` — tệp `SsrProtectionTest.java` — (chặn địa chỉ
+nội bộ ở cả tầng seed lẫn tầng tải trang),
+`RobotsTxtParserTest` (luật longest-match), `BackQueuesTest` / `UrlFrontierTest`
+(lịch sự theo host và ràng buộc một host một hàng đợi), `LanguageFilterTest`,
+`CrawlerServiceBusWiringTest` (đúng ba service được đăng ký ở chế độ in-process
+và **không** đăng ký ở chế độ bus ngoài).
+
+`KafkaCrawlBusIT` bị loại khỏi vòng test thường (`<testExcludes>`) vì cần Docker
+qua Testcontainers.
 
 ---
-
-## Why the admin key is mandatory
-
-`POST /api/admin/crawl` makes the server **fetch a URL chosen by the caller**
-and put the contents into an index that `GET /api/search` reads publicly. Leaving
-it open is a complete SSRF vulnerability with an exfiltration channel attached —
-on a cloud VM, a request to `169.254.169.254` returns temporary IAM credentials.
-
-So the app **deliberately refuses to start** without a key. The alternative —
-generating a key and printing it to the log — produces a system that *looks*
-healthy while nobody knows the key. Fail loudly rather than fail silently.
-
-Four independent layers, each blocking something different:
-
-| Layer | Blocks | Implemented in |
-|---|---|---|
-| API key (constant-time comparison) | Strangers | `ApiKeyAuthFilter` |
-| Private IP ranges blocked **after DNS resolution**, on every fetch and every redirect hop | URLs pointing into the internal network, even with a valid key | `SeedUrlValidator` + `HtmlDownloader` |
-| Caps on `maxPages` / `maxDepth` | A single valid request exhausting resources | `AdminController` |
-| Rate limiting (token bucket) | Correct calls arriving too fast | `RateLimitFilter` |
-
----
-
-## Development
-
-```bash
-cd search-engine && ./mvnw clean verify   # 640 tests + coverage gate + static analysis
-cd browser-app  && npm run typecheck && npm run lint && npm test   # 128 tests
-```
-
-`verify` (not `test`) is what CI runs — it is the only phase that executes the
-coverage and static-analysis gates.
-
-### CI/CD
-
-Five workflows, all in [`.github/workflows/`](.github/workflows/):
-
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `ci.yml` | push to `main`, every PR | Tests, JaCoCo coverage gate, SpotBugs, frontend typecheck/lint/**Vitest**, Docker build, Trivy image scan, **Kafka integration tests**, **infrastructure validation** |
-| `cd.yml` | after CI passes on `main`; manual | Build + sign image, deploy to staging automatically and to production behind an approval, `--dry-run=server` first, automatic rollback if the rollout fails |
-| `codeql.yml` | push, PR, weekly | CodeQL SAST for Java and TypeScript |
-| `release.yml` | tag `v*.*.*` | Multi-arch image to GHCR with SBOM + provenance, cosign keyless signature, blocking CRITICAL CVE scan, GitHub Release |
-| `pr-title.yml` | PR opened/edited | Enforces Conventional Commits in the PR title |
-
-The `infrastructure` job validates what YAML normally only reveals at deploy
-time: `kustomize build` across all four layers, `kubeconform -strict` against
-the real Kubernetes schema, `promtool check rules` (a bad PromQL expression
-makes Prometheus refuse to load the **entire** rule file — losing every alert,
-silently), `amtool check-config`, `docker compose config` at all three profile
-levels, and a diff that stops the Compose and Kubernetes alert rules from
-drifting apart.
-
-Four quality gates block a merge, each catching a different kind of breakage:
-
-```
-640 tests           → per-unit logic errors
-JaCoCo coverage     → new code with no tests          (line ≥ 68%, branch ≥ 65%)
-SpotBugs            → bugs no test path reaches       (0 findings)
-Ranking quality     → search got worse, tests stayed green
-```
-
-The frontend has three gates of its own — `typecheck`, `lint` and **128 Vitest
-cases**. The last one is the only one that checks *behaviour*: it pins down the
-main-process navigation policy, which is a security boundary (`file://` and
-`javascript:` must be refused — see `src/main/urlPolicy.ts`).
-
-The last one is search-specific: the other three can all be green while results
-returned to users have degraded. See `RankingQualityTest`.
-
-Dependency updates are automated via [`dependabot.yml`](.github/dependabot.yml)
-for Maven, npm, and GitHub Actions.
-
-### Configuration
-
-Every environment variable is documented in [`.env.example`](.env.example). Only
-`ADMIN_API_KEY` is required; everything else has a sensible default.
-
-Switch the scoring model to BM25 (higher MRR — see
-[`docs/EVALUATION.md`](docs/EVALUATION.md)):
-
-```bash
-APP_RANKING_SCORER=bm25
-```
-
----
-
-## Documentation
-
-Documentation is written in Vietnamese.
-
-| File | Contents |
-|---|---|
-Docs are organised by **the question they answer**, not by source folder:
-
-> **New here? Start with [`docs/README.md`](docs/README.md)** — a roadmap that
-> picks a reading order for you (run it / understand it / study the algorithms
-> / operate it), plus a "want to change X, read Y" lookup table. The docs are
-> written in Vietnamese; this README is the English entry point.
-
-| Document | Answers |
-|---|---|
-| [**`docs/README.md`**](docs/README.md) | **Documentation roadmap — which of the 69 files to read, in what order** |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How do the pieces fit into one working system? |
-| [`docs/BACKEND.md`](docs/BACKEND.md) | How is the Spring Boot app assembled — beans, config, request lifecycle? |
-| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Every config key, its default, and what breaks if you change it |
-| [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) | Where does it run, and who watches it? Docker, Kubernetes, monitoring |
-| [`docs/DEVOPS.md`](docs/DEVOPS.md) | How does code get from a laptop to a cluster? CI/CD, the seven gates |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | What is it defended against, and **what is still open**? |
-| [**`docs/ACCOUNTS-AND-DASHBOARD.md`**](docs/ACCOUNTS-AND-DASHBOARD.md) | **Accounts, roles and the admin dashboard — who may see what, and six real bugs the tests missed** |
-| [`docs/FRONTEND.md`](docs/FRONTEND.md) | The mini browser (Electron + React) |
-| [`football-service/README.md`](football-service/README.md) | The football microservice — why a 100-calls/day quota decides every design choice inside it |
-| [`docs/DSA-REPORT.md`](docs/DSA-REPORT.md) | Big-O and measured numbers |
-| [`docs/Math/`](docs/Math/README.md) | One page per class — formulas, worked examples, mind maps |
-| [`docs/Math/08-design-patterns/`](docs/Math/08-design-patterns/README.md) | One page per design pattern, and the bug each one fixed |
-| [`docs/Math/09-kafka/`](docs/Math/09-kafka/00-SO-DO-TU-DUY.md) | Kafka and the Modular Services — where the pipeline is cut, and why the URL Frontier is **not** replaced |
-| [`docs/Math/10-images/`](docs/Math/10-images/00-SO-DO-TU-DUY.md) | Image crawling and search — why filtering happens at crawl time |
-| [`docs/Math/11-devops/`](docs/Math/11-devops/00-SO-DO-TU-DUY.md) | CI/CD in detail — every workflow, every gate, file by file |
-| [`docs/Math/12-security/`](docs/Math/12-security/00-SO-DO-TU-DUY.md) | Every defence layer, and what breaks if you remove it |
-| [`docs/EVALUATION.md`](docs/EVALUATION.md) | Search quality measurement (MRR, P@k, nDCG) |
-| [`docs/SO-SANH-PHUONG-AN.md`](docs/SO-SANH-PHUONG-AN.md) | 13 problems, the alternatives rejected, and why |
-| [`docs/GIN-BASELINE.md`](docs/GIN-BASELINE.md) | Head-to-head against PostgreSQL GIN |
-
----
-
-## Repository layout
-
-```
-search-engine/          Spring Boot backend (Java 17)
-  src/main/java/com/vnsearch/
-    crawler/            Fetching, URL filtering, two-tier frontier
-    index/              Inverted index, VByte compression, VN segmenter
-    query/              Query parsing, posting-list merging
-    ranking/            TF-IDF, BM25, PageRank, snippet generation
-    datastructure/      Trie, BloomFilter, MinHeap, LRUCache, SparseMatrix
-    eval/               Search quality harness
-browser-app/            Mini browser (Electron + React + TypeScript)
-  src/renderer/src/components/football/
-                        Full-screen football page, ported from the iOS app
-football-service/       Football data microservice (Go + Postgres), profile `football`
-  internal/apifootball/ API-Football client and normalisers
-  internal/service/     Cache-aside, daily call budget, fallback order
-  internal/sample/      Sample data, so every screen works with no API key
-deploy/
-  k8s/                  Kustomize base + dev/prod overlays
-  kind/                 Local three-node cluster
-docs/                   Documentation
-.github/workflows/      CI, CodeQL, release, PR title checks
-```
-
-The Vietnamese dictionary is generated from
-[`coccoc-tokenizer`](https://github.com/coccoc/coccoc-tokenizer) (LGPL-3.0),
-which is **not** vendored here — clone it separately if you need to regenerate
-`vietnamese-words.txt`. See `docs/DSA-REPORT.md` §2.8.
