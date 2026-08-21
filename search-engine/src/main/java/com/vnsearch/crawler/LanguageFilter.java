@@ -79,39 +79,153 @@ public class LanguageFilter {
     private final Map<String, AtomicLong> rejectedByLanguage = new ConcurrentHashMap<>();
 
     public boolean accept(WebDocument doc) {
+        if (doc == null) {
+            return false;
+        }
+        // Ghép tiêu đề với thân bài: trang danh mục có thân bài rất ngắn,
+        // tiêu đề khi đó là phần văn bản đáng tin duy nhất.
+        String text = (doc.getTitle() == null ? "" : doc.getTitle() + " ")
+                + (doc.getBodyText() == null ? "" : doc.getBodyText());
+        String language = detect(doc.getLanguage(), text);
+        doc.setLanguage(language);
 
+        switch (language) {
+            case VIETNAMESE -> acceptedVietnamese.incrementAndGet();
+            case ENGLISH -> acceptedEnglish.incrementAndGet();
+            case UNDETERMINED -> acceptedUndetermined.incrementAndGet();
+            default -> {
+                rejected.incrementAndGet();
+                rejectedByLanguage.computeIfAbsent(language, k -> new AtomicLong())
+                        .incrementAndGet();
+                return false;
+            }
+        }
+        return true;
     }
 
     public String detect(String declaredLang, String text) {
+        String hint = normalizeLanguageTag(declaredLang);
+        if (text == null || text.isBlank()) {
+            return isViOrEn(hint) ? hint : UNDETERMINED;
+        }
+        String sample = text.length() > SAMPLE_LIMIT ? text.substring(0, SAMPLE_LIMIT) : text;
 
+        // --- Tầng 1: hệ chữ viết ---
+        Map<String, Integer> foreignByLanguage = new HashMap<>();
+        int letters = 0;
+        int foreignLetters = 0;
+        int vietnameseMarks = 0;
+        for (int i = 0; i < sample.length(); i++) {
+            char c = sample.charAt(i);
+            if (!Character.isLetter(c)) {
+                continue;
+            }
+            letters++;
+            if ((c >= 'Ạ' && c <= 'ỹ') || VIETNAMESE_ONLY_CHARS.contains(c)) {
+                vietnameseMarks++;
+                continue; // chắc chắn là chữ Latinh, khỏi tra bảng script
+            }
+            Character.UnicodeScript script = Character.UnicodeScript.of(c);
+            if (script == Character.UnicodeScript.LATIN
+                    || script == Character.UnicodeScript.COMMON
+                    || script == Character.UnicodeScript.INHERITED) {
+                continue;
+            }
+            foreignLetters++;
+            String lang = SCRIPT_LANGUAGE.getOrDefault(
+                    script, script.name().toLowerCase(Locale.ROOT));
+            foreignByLanguage.merge(lang, 1, Integer::sum);
+        }
+        if (letters == 0) {
+            return isViOrEn(hint) ? hint : UNDETERMINED;
+        }
+        if ((double) foreignLetters / letters > FOREIGN_SCRIPT_THRESHOLD) {
+            return foreignByLanguage.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .orElse(OTHER_LATIN);
+        }
+
+        // --- Tầng 2: dấu phụ đặc trưng tiếng Việt ---
+        if ((double) vietnameseMarks / letters >= VIETNAMESE_DIACRITIC_THRESHOLD) {
+            return VIETNAMESE;
+        }
+
+        // --- Tầng 3: từ chức năng ---
+        String[] tokens = sample.toLowerCase(Locale.ROOT).split("[^\\p{L}]+");
+        int total = 0;
+        int viHits = 0;
+        int enHits = 0;
+        for (String token : tokens) {
+            if (token.isEmpty()) {
+                continue;
+            }
+            total++;
+            if (VIETNAMESE_FUNCTION_WORDS.contains(token)) {
+                viHits++;
+            } else if (ENGLISH_FUNCTION_WORDS.contains(token)) {
+                enHits++;
+            }
+        }
+        if (total < MIN_TOKENS_FOR_CONTENT_EVIDENCE) {
+            // Quá ngắn để kết luận: tin tạm <html lang>, không có thì cho qua.
+            return isViOrEn(hint) ? hint : UNDETERMINED;
+        }
+        if ((double) viHits / total >= VIETNAMESE_WORD_THRESHOLD) {
+            return VIETNAMESE;
+        }
+        double englishRatio = (double) enHits / total;
+        if (englishRatio >= ENGLISH_WORD_THRESHOLD
+                || (ENGLISH.equals(hint) && englishRatio >= ENGLISH_WORD_THRESHOLD_WITH_HINT)) {
+            return ENGLISH;
+        }
+        // Chữ Latinh, đủ dài, mà không có dấu hiệu của cả hai: Pháp, Đức,
+        // Indonesia, Tây Ban Nha... — đúng thứ chính sách này loại.
+        return OTHER_LATIN;
     }
 
     public static String normalizeLanguageTag(String tag) {
-
+        if (tag == null || tag.isBlank()) {
+            return "";
+        }
+        String lower = tag.trim().toLowerCase(Locale.ROOT);
+        int dash = lower.indexOf('-');
+        if (dash > 0) {
+            lower = lower.substring(0, dash);
+        }
+        int underscore = lower.indexOf('_');
+        if (underscore > 0) {
+            lower = lower.substring(0, underscore);
+        }
+        return lower;
     }
 
-    public static boolean isViorEn(String code) {
-
+    private static boolean isViOrEn(String code) {
+        return VIETNAMESE.equals(code) || ENGLISH.equals(code);
     }
 
     public long getAcceptedVietnameseCount() {
-
-    }
+        return acceptedVietnamese.get();
+    
 
     public long getAcceptedEnglishCount() {
-
+        return acceptedEnglish.get();
     }
 
-    public long getAcceptedUndeterminedCount(){
-
+    public long getAcceptedUndeterminedCount() {
+        return acceptedUndetermined.get();
     }
 
     public long getRejectedCount() {
-
-    }
+        return rejected.get();
+    
 
     public Map<String, Long> getRejectedByLanguage() {
-        
+        Map<String, Long> snapshot = new LinkedHashMap<>();
+        rejectedByLanguage.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue().get(), a.getValue().get()))
+                .forEach(e -> snapshot.put(e.getKey(), e.getValue().get()));
+        return snapshot;
     }
 
     /** Demo*/

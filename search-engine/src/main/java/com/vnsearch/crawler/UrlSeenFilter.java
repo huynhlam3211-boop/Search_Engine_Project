@@ -45,6 +45,55 @@ public class UrlSeenFilter {
     }
 
     public boolean markSeenIfNew(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        synchronized (lock) {
+            if (bloomFilter.mightContain(url)) {
+                return false;
+            }
+            bloomFilter.add(url);
+            seenCount++;
+            urlStorage.append(url);
+            return true;
+        }
+    }
 
+    public boolean seenBefore(String url) {
+        if (url == null || url.isBlank()) {
+            return true;
+        }
+        synchronized (lock) {
+            return bloomFilter.mightContain(url);
+        }
+    }
+
+    public long replayFromStorage() {
+        return urlStorage.replay(url -> {
+            synchronized (lock) {
+                if (!bloomFilter.mightContain(url)) {
+                    bloomFilter.add(url);
+                    seenCount++;
+                }
+            }
+        });
+    }
+
+    public long getSeenCount() {
+        synchronized (lock) {
+            return seenCount;
+        }
+    }
+
+    public int getNumBits() {
+        return bloomFilter.getNumBits();
+    }
+
+    public int getNumHashes() {
+        return bloomFilter.getNumHashes();
+    }
+
+    public UrlStorage getUrlStorage() {
+        return urlStorage;
     }
 }

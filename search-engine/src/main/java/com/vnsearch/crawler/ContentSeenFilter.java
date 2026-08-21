@@ -16,28 +16,50 @@ public class ContentSeenFilter {
     private final AtomicLong blankSkipped = new AtomicLong();
 
     public boolean seenBefore(String bodyText) {
-
+        if (bodyText == null || bodyText.isBlank()) {
+            blankSkipped.incrementAndGet();
+            return false;
+        }
+        String fingerprint = fingerprint(bodyText);
+        boolean isNew = fingerprints.add(fingerprint);
+        if (!isNew) {
+            duplicates.incrementAndGet();
+        }
+        return !isNew;
     }
 
     /** Vân tay SHA-256 (dạng hex) của văn bản sau khi chuẩn hoá. */
     public static String fingerprint(String text) {
-
+        String normalized = normalize(text);
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(normalized.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(Character.forDigit((b >> 4) & 0xf, 16));
+                hex.append(Character.forDigit(b & 0xf, 16));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 là thuật toán bắt buộc mọi JVM phải có theo đặc tả Java.
+            throw new IllegalStateException("JVM không hỗ trợ SHA-256", e);
+        }
     }
 
     private static String normalize(String text) {
-
+        return text.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
     }
 
     public int size() {
-
+        return fingerprints.size();
     }
 
     public long getDuplicateCount() {
-
+        return duplicates.get();
     }
 
     public long getBlankSkippedCount() {
-
+        return blankSkipped.get();
     }
 
     public static void main(String[] args) {
