@@ -32,6 +32,35 @@ class LanguageFilterTest {
             + "supporters venus de toutes les régions du pays pour encourager leur équipe "
             + "favorite lors de cette soirée particulièrement attendue par les amateurs.";
 
+    /**
+     * Bài tiếng Anh của một tờ báo Việt Nam: văn xuôi hoàn toàn tiếng Anh, nhưng tên
+     * riêng được viết CÓ DẤU. Đo trên vietnamnews.vn thật, tỷ lệ dấu đạt ~2,9% — vượt
+     * ngưỡng 0,5% cũ và khiến trang bị gán nhãn {@code vi}.
+     */
+    private static final String ENGLISH_ARTICLE_WITH_VIETNAMESE_NAMES =
+            "More than 7,000 martyr remains sent on special flight to Hà Nội for DNA "
+            + "identification. After the military transport aircraft arrived at Gia Lâm "
+            + "Airport, the Air Defence-Air Force Service handed over the samples for road "
+            + "transport to the Việt Nam Academy of Science and Technology, where DNA "
+            + "testing will be conducted to identify the remains. Việt Nam needs an "
+            + "integrated approach as urban flooding worsens in Đà Nẵng and Cần Thơ. "
+            + "Flooding must therefore be managed through an integrated approach that "
+            + "involves water resources, urban planning and disaster-risk governance, "
+            + "with support from the people of Nghệ An and Đắk Lắk.";
+
+    /**
+     * Trang liệt kê tiếng Việt: nhiều tên riêng, gần như không có từ chức năng, và
+     * phần lớn viết KHÔNG dấu. Tỷ lệ dấu thấp nhưng khác 0 — chốt cuối phải giữ
+     * nhãn {@code vi} cho ca này.
+     */
+    private static final String VIETNAMESE_LISTING_PAGE =
+            "Ha Noi Ho Chi Minh Da Nang Hai Phong Can Tho Nghe An Thanh Hoa Quang Ninh "
+            + "Bac Ninh Nam Dinh Thai Binh Ninh Binh Ha Nam Hung Yen Hai Duong Bac Giang "
+            + "Bac Kan Cao Bang Lang Son Tuyen Quang Ha Giang Lao Cai Yen Bai Phu Tho "
+            + "Vinh Phuc Son La Dien Bien Lai Chau Hoa Binh Quang Tri Thua Thien Hue "
+            + "Quang Nam Quang Ngai Binh Dinh Phu Yen Khanh Hoa Ninh Thuan Binh Thuan "
+            + "Kon Tum Gia Lai Dak Lak Lâm Đồng";
+
     @Test
     void keepsVietnamese() {
         LanguageFilter filter = new LanguageFilter();
@@ -77,6 +106,22 @@ class LanguageFilterTest {
         LanguageFilter filter = new LanguageFilter();
         assertEquals(LanguageFilter.VIETNAMESE, filter.detect("", "Trang chủ"));
         assertEquals(LanguageFilter.VIETNAMESE, filter.detect("en", "Thể thao"));
+    }
+
+    @Test
+    void vietnameseProperNounsDoNotMakeAnEnglishArticleVietnamese() {
+        LanguageFilter filter = new LanguageFilter();
+        assertEquals(LanguageFilter.ENGLISH,
+                filter.detect("", ENGLISH_ARTICLE_WITH_VIETNAMESE_NAMES));
+        // Kể cả khi <html lang> khai sai là "vi", nội dung vẫn phải thắng.
+        assertEquals(LanguageFilter.ENGLISH,
+                filter.detect("vi", ENGLISH_ARTICLE_WITH_VIETNAMESE_NAMES));
+    }
+
+    @Test
+    void sparseDiacriticsStillDecideWhenNoFunctionWordEvidenceExists() {
+        LanguageFilter filter = new LanguageFilter();
+        assertEquals(LanguageFilter.VIETNAMESE, filter.detect("", VIETNAMESE_LISTING_PAGE));
     }
 
     @Test

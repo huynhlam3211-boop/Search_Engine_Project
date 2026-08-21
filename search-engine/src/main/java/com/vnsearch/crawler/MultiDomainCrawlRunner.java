@@ -182,10 +182,11 @@ public class MultiDomainCrawlRunner {
         UrlFilter filter = crawler.getUrlFilter();
         System.out.printf("URL Filter     : nhan %d, loai %d%n",
                 filter.getAcceptedCount(), filter.getTotalRejectedCount());
-        System.out.printf("                 (domain %d | duoi tep %d | do sau %d | scheme %d | robots %d)%n",
-                filter.getRejectedByDomainCount(), filter.getRejectedByExtensionCount(),
-                filter.getRejectedByDepthCount(), filter.getRejectedBySchemeCount(),
-                filter.getRejectedByRobotsCount());
+        System.out.printf("                 (domain %d | tien to host %d | duoi tep %d | do sau %d "
+                        + "| scheme %d | robots %d)%n",
+                filter.getRejectedByDomainCount(), filter.getRejectedByHostPrefixCount(),
+                filter.getRejectedByExtensionCount(), filter.getRejectedByDepthCount(),
+                filter.getRejectedBySchemeCount(), filter.getRejectedByRobotsCount());
 
         UrlSeenFilter urlSeen = crawler.getUrlSeenFilter();
         System.out.printf("URL Seen?      : %d URL phan biet, bo loc %d bit (%.1f KB), %d ham bam%n",
@@ -237,10 +238,12 @@ public class MultiDomainCrawlRunner {
         }
         long crossDomainLinks = 0;
         long internalLinks = 0;
+        long danglingLinks = 0;
         for (WebDocument doc : docs) {
             String from = hostOf(doc.getUrl());
             for (String outlink : doc.getOutlinks()) {
                 if (!crawledUrls.contains(outlink)) {
+                    danglingLinks++;
                 }
                 if (hostOf(outlink).equals(from)) {
                     internalLinks++;
@@ -252,6 +255,8 @@ public class MultiDomainCrawlRunner {
         long edges = internalLinks + crossDomainLinks;
         System.out.printf("Canh do thi (nnz): %d (noi bo %d, CHEO domain %d)%n",
                 edges, internalLinks, crossDomainLinks);
+        System.out.printf("Canh treo         : %d (%.1f%%) - tro toi trang CHUA co trong corpus%n",
+                danglingLinks, edges == 0 ? 0.0 : 100.0 * danglingLinks / edges);
         if (!docs.isEmpty()) {
             double density = (double) edges / ((double) docs.size() * docs.size());
             System.out.printf("Ty le thua       : %.4f%% (nnz/n^2)%n", density * 100);

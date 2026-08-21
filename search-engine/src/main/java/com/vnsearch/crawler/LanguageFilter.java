@@ -22,7 +22,23 @@ public class LanguageFilter {
     /** Tỷ lệ chữ cái thuộc hệ chữ khác đủ để kết luận trang không phải vi/en. */
     private static final double FOREIGN_SCRIPT_THRESHOLD = 0.10;
 
-    /** Tỷ lệ ký tự mang dấu đặc trưng tiếng Việt đủ để kết luận là tiếng Việt. */
+    /**
+     * Tỷ lệ ký tự mang dấu ĐỦ DÀY để một mình nó kết luận là tiếng Việt.
+     *
+     * <p>Văn xuôi tiếng Việt thật đạt 20–30%. Ngưỡng 5% để lại biên rất rộng cho
+     * trang ít văn xuôi, nhưng vẫn nằm TRÊN mức mà một trang tiếng Anh viết về Việt
+     * Nam đạt được chỉ nhờ tên riêng có dấu — đo trên vietnamnews.vn là ~2,9%
+     * ({@code Việt Nam}, {@code Hà Nội}, {@code Đắk Lắk}...). Ngưỡng cũ 0,5% khiến
+     * đúng trang đó bị gán nhãn {@code vi}.
+     */
+    private static final double VIETNAMESE_DIACRITIC_STRONG = 0.05;
+
+    /**
+     * Tỷ lệ ký tự mang dấu đủ để NGHIÊNG về tiếng Việt khi không còn bằng chứng nào
+     * khác — dùng làm chốt cuối, sau khi phép đếm từ chức năng đã thất bại cho cả hai
+     * ngôn ngữ. Các ký tự này chỉ xuất hiện trong tiếng Việt, nên dù thưa chúng vẫn
+     * đáng tin hơn {@code <html lang>}.
+     */
     private static final double VIETNAMESE_DIACRITIC_THRESHOLD = 0.005;
 
     /** Tỷ lệ token là từ chức năng tiếng Việt đủ để kết luận là tiếng Việt. */
@@ -147,7 +163,11 @@ public class LanguageFilter {
         }
 
         // --- Tầng 2: dấu phụ đặc trưng tiếng Việt ---
-        if ((double) vietnameseMarks / letters >= VIETNAMESE_DIACRITIC_THRESHOLD) {
+        // Chỉ kết luận ngay khi dấu thanh DÀY ĐẶC. Dấu thanh THƯA thì chưa đủ: một
+        // trang tiếng Anh viết về Việt Nam cũng đạt mức đó chỉ nhờ tên riêng có dấu.
+        // Ca đó được nhường cho tầng 3 phân xử; dấu thanh thưa quay lại làm chốt cuối.
+        double diacriticRatio = (double) vietnameseMarks / letters;
+        if (diacriticRatio >= VIETNAMESE_DIACRITIC_STRONG) {
             return VIETNAMESE;
         }
 
@@ -168,7 +188,13 @@ public class LanguageFilter {
             }
         }
         if (total < MIN_TOKENS_FOR_CONTENT_EVIDENCE) {
-            // Quá ngắn để kết luận: tin tạm <html lang>, không có thì cho qua.
+            // Quá ngắn để đếm từ chức năng. Dấu thanh dù thưa vẫn là dấu hiệu RIÊNG
+            // của tiếng Việt, đáng tin hơn <html lang> — giữ nguyên hành vi cũ cho
+            // tiêu đề ngắn kiểu "Trang chủ", "Tin tức trong nước".
+            if (diacriticRatio >= VIETNAMESE_DIACRITIC_THRESHOLD) {
+                return VIETNAMESE;
+            }
+            // Không có dấu nào: tin tạm <html lang>, không có thì cho qua.
             return isViOrEn(hint) ? hint : UNDETERMINED;
         }
         if ((double) viHits / total >= VIETNAMESE_WORD_THRESHOLD) {
@@ -179,7 +205,13 @@ public class LanguageFilter {
                 || (ENGLISH.equals(hint) && englishRatio >= ENGLISH_WORD_THRESHOLD_WITH_HINT)) {
             return ENGLISH;
         }
-        // Chữ Latinh, đủ dài, mà không có dấu hiệu của cả hai: Pháp, Đức,
+        // Chốt cuối: không đủ từ chức năng của CẢ HAI ngôn ngữ, nhưng có dấu thanh.
+        // Đây là trang liệt kê, trang nhiều tên riêng, trang ít văn xuôi tiếng Việt —
+        // tầng 2 cũ bắt được chúng, và chốt này giữ nguyên kết quả đó.
+        if (diacriticRatio >= VIETNAMESE_DIACRITIC_THRESHOLD) {
+            return VIETNAMESE;
+        }
+        // Chữ Latinh, đủ dài, không dấu thanh, không dấu hiệu của cả hai: Pháp, Đức,
         // Indonesia, Tây Ban Nha... — đúng thứ chính sách này loại.
         return OTHER_LATIN;
     }
