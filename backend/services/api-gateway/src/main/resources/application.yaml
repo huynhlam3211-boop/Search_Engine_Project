@@ -1,0 +1,164 @@
+spring:
+  application:
+    name: api-gateway
+  
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+  
+  security:
+    oauth2:
+      resourcesserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://auth-service:8081/oauth2/jwks}
+          issuer-uri: ${AUTH_ISSUER_URI:http://auth-service:8081}
+          audiences: ${AUTH_AUDIENCE:vnsearch-api}
+  
+  cloud:
+    gateway:
+      server:
+        webflux:
+
+          default-filters: 
+            # Access-Control-Allow-Origin → "trang web nào được phép gọi tôi"
+            # Access-Control-Allow-Credentials → "có cho phép gửi kèm cookie/thông tin đăng nhập không"
+            # Access-Control-Allow-Methods → "được dùng phương thức nào (GET, POST...)"
+            # Access-Control-Allow-Headers → "được gửi kèm header nào"
+
+            # RETAIN_UNIQUE giữ lại các giá trị duy nhất trong danh sách trùng —
+            # ở đây hai giá trị luôn giống hệt nhau nên kết quả gọn về một.
+          
+            - DedupeResponseHeader = Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Allow-Headers , RETAIN_UNIQUE
+          routes:
+
+            # ---- auth-service ----------------------------------------------
+            - id: auth-oauth2
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+              predicates:
+                - Path=/oauth2/**,/.well-known/**
+
+            - id: auth-admin-users
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+              predicates:
+                - Path=/api/admin/users/**
+
+            - id: auth-api
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+              predicates:
+                - Path=/api/auth/**
+
+            # ---- search-service --------------------------------------------
+            - id: search-api
+              uri: ${SEARCH_SERVICE_URL:http://search-service:8082}
+              predicates:
+                - Path=/api/search,/api/suggest,/api/images,/api/feed,/api/health
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 30
+                    key-resolver: "#{@userOrIpKeyResolver}"
+
+            - id: search-soap
+              uri: ${SEARCH_SERVICE_URL:http://search-service:8082}
+              predicates:
+                - Path=/ws/**
+
+            # ---- analytics-service -----------------------------------------
+            
+            - id: analytics-admin
+              uri: ${ANALYTICS_SERVICE_URL:http://analytics-service:8084}
+              predicates:
+                - Path=/api/admin/analytics/**
+
+            - id: analytics-events
+              uri: ${ANALYTICS_SERVICE_URL:http://analytics-service:8084}
+              predicates:
+                - Path=/api/events
+
+            # ---- crawler-service -------------------------------------------
+            
+            - id: crawler-admin
+              uri: ${CRAWLER_SERVICE_URL:http://crawler-service:8083}
+              predicates:
+                - Path=/api/admin/**
+
+            # ---- history-service -------------------------------------------
+            - id: history-api
+              uri: ${HISTORY_SERVICE_URL:http://history-service:8085}
+              predicates:
+                - Path=/api/history/**
+
+            # ---- downloads-service -----------------------------------------
+            - id: downloads-api
+              uri: ${DOWNLOADS_SERVICE_URL:http://downloads-service:8086}
+              predicates:
+                - Path=/api/downloads/**
+
+            # ---- settings-service ------------------------------------------
+            - id: settings-api
+              uri: ${SETTINGS_SERVICE_URL:http://settings-service:8087}
+              predicates:
+                - Path=/api/settings/**
+
+            # ---- football-service ------------------------------------------
+            
+            - id: football-api
+              uri: ${FOOTBALL_SERVICE_URL:http://football-service:8090}
+              predicates:
+                - Path=/api/football/**
+              filters:
+                - RewritePath=/api/football/(?<duoi>.*), /api/$\{duoi}
+
+app: 
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  gateway: 
+    denylist:
+      # Tra danh sách thu hồi token trên Redis. Tắt được để chạy thử không cần
+      # Redis; TẮT Ở MÔI TRƯỜNG THẬT nghĩa là "đăng xuất" không có hiệu lực
+      # thật trong 15 phút.
+      enabled: ${GATEWAY_DENYLIST_ENABLED:true}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: api-gateway
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: auth-service
+        url: /api/auth/v3/api-docs
+      - name: search-service
+        url: /api/search/v3/api-docs
+      - name: crawler-service
+        url: /api/admin/v3/api-docs
+      - name: history-service
+        url: /api/history/v3/api-docs
+      - name: downloads-service
+        url: /api/downloads/v3/api-docs
+      - name: settings-service
+        url: /api/settings/v3/api-docs
+
+logging:
+  level:
+    org.springframework.cloud.gateway: ${GATEWAY_LOG_LEVEL:INFO}
