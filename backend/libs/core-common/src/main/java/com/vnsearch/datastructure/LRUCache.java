@@ -4,13 +4,48 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class LRUCache<K, V> { 
+/**
+ * LRU (Least Recently Used) Cache tự cài đặt, dùng để cache kết quả tìm kiếm
+ * gần đây và trang đã ghé trong trình duyệt.
+ *
+ * <p>Cấu trúc: {@code HashMap<K, Node>} để tra cứu O(1) kết hợp Doubly Linked
+ * List TỰ VIẾT (không dùng {@link java.util.LinkedHashMap} có sẵn, để chứng
+ * minh hiểu rõ cơ chế O(1) bên dưới). Danh sách liên kết có 2 node lính canh
+ * (sentinel head/tail) không chứa dữ liệu thật, chỉ để đánh dấu 2 đầu — nhờ
+ * vậy mọi thao tác thêm/xoá node đầu tiên hoặc cuối cùng không cần kiểm tra
+ * null riêng, giảm hẳn số nhánh if/else.
+ *
+ * <p>Quy ước thứ tự: node ngay sau {@code head} là phần tử được dùng GẦN ĐÂY
+ * NHẤT (MRU), node ngay trước {@code tail} là phần tử ít dùng nhất (LRU) — sẽ
+ * bị loại bỏ đầu tiên khi cache đầy.
+ *
+ * <p><b>Vì sao phải là danh sách liên kết ĐÔI.</b> Xoá một node ở <i>giữa</i>
+ * trong O(1) đòi hỏi biết <b>cả</b> node trước và node sau. Danh sách đơn phải
+ * duyệt từ đầu để tìm node trước, tức O(n) — và khi đó cache LRU mất hoàn toàn
+ * ưu điểm, vì mỗi lần truy cập đều thành O(n).
+ *
+ * <p>Thread-safe bằng {@link ReentrantReadWriteLock}. Lưu ý quan trọng:
+ * {@code get()} về bản chất KHÔNG phải thao tác đọc thuần tuý vì nó di chuyển
+ * node lên đầu danh sách (cập nhật recency), nên phải dùng write lock giống
+ * như {@code put()} — nếu dùng read lock cho {@code get()} thì nhiều luồng đọc
+ * đồng thời sẽ cùng sửa đổi danh sách liên kết và làm hỏng cấu trúc dữ liệu.
+ * Đây là điểm khác biệt so với {@link Trie}, nơi {@code getSuggestions} là đọc
+ * thật sự nên dùng được read lock.
+ *
+ * <p>Độ phức tạp thời gian: {@link #get(Object)} và {@link #put(Object, Object)}
+ * đều O(1) (tra cứu HashMap O(1) + thao tác danh sách liên kết đôi tại một vị
+ * trí đã biết là O(1)). Độ phức tạp không gian: O(capacity).
+ *
+ * @param <K> loại khoá
+ * @param <V> loại giá trị
+ */
+public class LRUCache<K, V> {
 
-    private static class Node<K,V>{
+    private static class Node<K, V> {
         K key;
         V value;
-        Node<K,V> prev;
-        Node<K,V> next;
+        Node<K, V> prev;
+        Node<K, V> next;
 
         Node(K key, V value) {
             this.key = key;
@@ -19,9 +54,9 @@ public class LRUCache<K, V> {
     }
 
     private final int capacity;
-    private final Map<K, Node<K,V>> map;
-    private final Node<K,V> head;
-    private final Node<K,V> tail;
+    private final Map<K, Node<K, V>> map;
+    private final Node<K, V> head; // lính canh, đầu là MRU
+    private final Node<K, V> tail; // lính canh, cuối là LRU
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     public LRUCache(int capacity) {

@@ -6,8 +6,35 @@ import org.jsoup.nodes.Element;
 
 import java.time.Instant;
 
+/**
+ * <b>Khối "Content Parser"</b> trong sơ đồ kiến trúc crawler.
+ *
+ * <p>Nhận cây DOM đã được {@link HtmlDownloader} tải và phân tích, rút ra
+ * phần <b>nội dung</b> của trang: tiêu đề, mô tả meta, văn bản thân bài.
+ *
+ * <p><b>Vì sao không rút luôn cả liên kết ở đây.</b> Sơ đồ kiến trúc tách
+ * {@code Content Parser} và {@code Link Extractor} thành hai khối, và thứ
+ * tự giữa chúng có ý nghĩa: giữa hai khối còn có {@code Content Seen?}.
+ * Nếu một trang là bản trùng nội dung, ta vứt nó ngay sau khi phân tích
+ * nội dung và <b>không</b> bóc liên kết — vì các liên kết đó đã được lấy từ
+ * bản gốc rồi. Gộp hai việc vào một lớp (như {@code HtmlExtractor} bản cũ)
+ * khiến công đoạn bóc liên kết luôn chạy, kể cả với trang sắp bị vứt.
+ * Việc bóc liên kết nay do {@link LinkExtractor} đảm nhiệm.
+ *
+ * <p>Jsoup là thư viện DUY NHẤT được phép dùng để PARSE HTML theo đặc tả —
+ * chỉ làm nhiệm vụ duyệt DOM, KHÔNG làm thay việc tokenize/index/rank; những
+ * việc đó vẫn do {@code VietnameseTokenizer}/{@code InvertedIndex}/
+ * {@code ResultRanker} tự cài đảm nhiệm.
+ */
 public class ContentParser {
 
+    /**
+     * Dựng một {@link WebDocument} từ cây DOM đã tải.
+     *
+     * <p>Tài liệu trả về chưa có {@code docId} (do {@code CrawlerService} gán
+     * sau) và <b>chưa có outlink</b> (do {@link LinkExtractor} điền sau, nếu
+     * trang vượt qua được bước kiểm tra trùng nội dung).
+     */
     public WebDocument parse(String url, Document document) {
         WebDocument doc = new WebDocument();
         doc.setUrl(url);
@@ -19,6 +46,16 @@ public class ContentParser {
         return doc;
     }
 
+    /**
+     * Ngôn ngữ mà trang <b>tự khai</b>, theo thứ tự ưu tiên {@code <html lang>}
+     * → {@code <meta http-equiv=content-language>} → {@code og:locale}.
+     *
+     * <p>Đây mới chỉ là một <b>gợi ý</b>, không phải kết luận: rất nhiều mã
+     * nguồn website để mặc định {@code lang="en"} trên toàn bộ site kể cả
+     * trang tiếng Việt. {@link LanguageFilter} sẽ ghi đè trường này bằng kết
+     * quả nhận diện theo nội dung, và chỉ dùng tới giá trị khai báo khi trang
+     * quá ngắn để có bằng chứng nội dung.
+     */
     private String extractDeclaredLanguage(Document document) {
         Element html = document.selectFirst("html");
         String declared = html != null ? html.attr("lang") : "";
@@ -46,19 +83,3 @@ public class ContentParser {
         return clone.body() != null ? clone.body().text().trim() : "";
     }
 }
-
-
-/**
- * HTML ĐẦU VÀO                                    KẾT QUẢ MONG ĐỢI
-   ────────────────────────────────────────        ────────────────────────
-   <title>Bài A</title>                            title = "Bài A"
-   <meta name=description content=" X ">           metaDescription = "X"  (đã trim)
-   chỉ có <meta property=og:description>           dùng og:description
-   không có meta nào                               ""  (không null)
-   <html lang="vi">                                language = "vi"
-   <html lang="en-US">                             normalizeLanguageTag("en-US")
-   không có lang, có og:locale=vi_VN               dùng og:locale
-   <body>A<script>var x=1</script>B</body>         bodyText = "A B"  (không có "var x=1")
-   <body><nav>Menu</nav>Nội dung</body>            bodyText = "Nội dung"
-   không có <body>                                 bodyText = ""  (không ném)
- */

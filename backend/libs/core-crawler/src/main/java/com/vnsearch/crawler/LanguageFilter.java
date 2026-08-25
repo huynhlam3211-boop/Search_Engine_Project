@@ -11,34 +11,93 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * <b>Khối "Language Filter"</b> trong sơ đồ kiến trúc crawler — khối nằm
+ * giữa {@code Content Parser} và {@code Content Seen?}.
+ *
+ * <p><b>Vì sao cần khối này.</b> Trước đây việc chặn ngoại ngữ chỉ dựa vào
+ * tiền tố host ({@link UrlFilter#NON_VI_EN_HOST_PREFIXES}) — rẻ, nhưng chỉ
+ * bắt được đúng những bản ngoại ngữ mà toà soạn <i>tự đặt lên subdomain có
+ * quy ước</i>. Ba loại trang lọt qua hoàn toàn:
+ * <ul>
+ *   <li>bài tiếng Trung/Nhật/Hàn nằm lẫn trong đường dẫn của trang tiếng Việt
+ *       ({@code /the-gioi/...} dẫn sang bản dịch);</li>
+ *   <li>toà soạn đặt bản ngoại ngữ ở đường dẫn chứ không ở subdomain
+ *       ({@code /zh/}, {@code /ru/});</li>
+ *   <li>trang có tiêu đề tiếng Việt nhưng thân bài là ngôn ngữ khác.</li>
+ * </ul>
+ * Lọc theo NỘI DUNG bắt được cả ba, vì nó nhìn thứ thật sự sẽ vào chỉ mục.
+ *
+ * <p><b>Chính sách:</b> chỉ giữ <b>tiếng Việt</b> và <b>tiếng Anh</b>. Mọi
+ * ngôn ngữ khác bị vứt ngay sau khi phân tích nội dung, và trang bị vứt
+ * <b>không được bóc liên kết</b> — giống hệt cách {@code Content Seen?} xử lý
+ * bản trùng. Đây là điểm quan trọng nhất về hiệu quả: một bài tiếng Trung
+ * hầu như chỉ trỏ sang các bài tiếng Trung khác, nên chặn ở mức tài liệu mà
+ * vẫn nuốt liên kết của nó thì crawler tiếp tục đi sâu vào vùng ngoại ngữ,
+ * tải hàng nghìn trang chỉ để vứt.
+ *
+ * <p><b>Ba tầng bằng chứng, xếp theo độ tin cậy giảm dần.</b>
+ * <ol>
+ *   <li><b>Hệ chữ viết</b> ({@link Character.UnicodeScript}). Chữ Hán, Kana,
+ *       Hangul, Kirin, Ả Rập, Thái... không thể là tiếng Việt hay tiếng Anh —
+ *       đây là bằng chứng gần như tuyệt đối, và rẻ (một phép tra bảng cho mỗi
+ *       ký tự). Ngưỡng {@value #FOREIGN_SCRIPT_THRESHOLD} chứ không phải 0 vì
+ *       trang tiếng Việt bình thường vẫn có thể trích một tên riêng tiếng Hán
+ *       hay một dòng tiếng Nga.</li>
+ *   <li><b>Dấu phụ đặc trưng tiếng Việt.</b> Khối Unicode
+ *       {@code U+1EA0..U+1EF9} cùng {@code ơ ư ă đ} gần như chỉ xuất hiện
+ *       trong tiếng Việt — khác hẳn {@code é à ô} vốn dùng chung với tiếng
+ *       Pháp, Bồ, Tây Ban Nha. Dùng chúng làm dấu hiệu nhận tiếng Việt cho
+ *       kết quả chắc chắn hơn nhiều so với đếm từ chức năng.</li>
+ *   <li><b>Từ chức năng tiếng Anh.</b> Với văn bản chữ Latinh không có dấu
+ *       tiếng Việt, cách phân biệt tiếng Anh với tiếng Pháp/Đức/Indonesia là
+ *       tỷ lệ từ chức năng: văn bản tiếng Anh thật có 25–40% token nằm trong
+ *       {@link #ENGLISH_FUNCTION_WORDS}, các thứ tiếng khác hiếm khi vượt
+ *       {@value #ENGLISH_WORD_THRESHOLD}.</li>
+ * </ol>
+ *
+ * <p><b>Vì sao KHÔNG tin thuộc tính {@code <html lang>}.</b> Nó sai rất
+ * thường xuyên: nhiều mã nguồn mở để mặc định {@code lang="en"} trên toàn
+ * site, kể cả trang tiếng Việt. Ở đây thuộc tính đó chỉ được dùng làm phương
+ * án cuối, khi trang quá ngắn để có bằng chứng nội dung (xem
+ * {@link #MIN_TOKENS_FOR_CONTENT_EVIDENCE}).
+ *
+ * <p><b>Nguyên tắc khi thiếu bằng chứng: CHO QUA.</b> Trang chỉ có menu và
+ * vài chữ (trang chuyên mục, trang phân trang) không đủ dữ liệu để kết luận
+ * — mà đó lại chính là những trang cung cấp nhiều liên kết nhất. Vứt nhầm
+ * chúng làm cụt cả một nhánh của đồ thị crawl, trong khi giữ nhầm chỉ tốn
+ * một bản ghi gần như rỗng.
+ *
+ * <p>Thread-safe: bảng từ bất biến, chỉ có bộ đếm nguyên tử thay đổi.
+ *
+ * <p>Độ phức tạp: O(độ dài văn bản) cho mỗi trang, có trần
+ * {@value #SAMPLE_LIMIT} ký tự nên không phụ thuộc độ dài bài.
+ */
 public class LanguageFilter {
+
+    /** Mã ngôn ngữ được giữ lại. */
     public static final String VIETNAMESE = "vi";
     public static final String ENGLISH = "en";
+
+    /** Không đủ bằng chứng để kết luận — vẫn được giữ (xem Javadoc lớp). */
     public static final String UNDETERMINED = "und";
+
+    /** Chữ Latinh nhưng không phải tiếng Việt cũng không phải tiếng Anh. */
     public static final String OTHER_LATIN = "other";
 
+    /**
+     * Chỉ xét {@value} ký tự đầu của thân bài.
+     *
+     * <p>Một bài báo dài 40.000 ký tự không cho biết gì thêm về ngôn ngữ so
+     * với 20.000 ký tự đầu, trong khi phần thừa nhân đôi chi phí trên đường
+     * đi nóng của crawler — khối này chạy cho MỌI trang tải về.
+     */
     private static final int SAMPLE_LIMIT = 20_000;
 
     /** Tỷ lệ chữ cái thuộc hệ chữ khác đủ để kết luận trang không phải vi/en. */
     private static final double FOREIGN_SCRIPT_THRESHOLD = 0.10;
 
-    /**
-     * Tỷ lệ ký tự mang dấu ĐỦ DÀY để một mình nó kết luận là tiếng Việt.
-     *
-     * <p>Văn xuôi tiếng Việt thật đạt 20–30%. Ngưỡng 5% để lại biên rất rộng cho
-     * trang ít văn xuôi, nhưng vẫn nằm TRÊN mức mà một trang tiếng Anh viết về Việt
-     * Nam đạt được chỉ nhờ tên riêng có dấu — đo trên vietnamnews.vn là ~2,9%
-     * ({@code Việt Nam}, {@code Hà Nội}, {@code Đắk Lắk}...). Ngưỡng cũ 0,5% khiến
-     * đúng trang đó bị gán nhãn {@code vi}.
-     */
-    private static final double VIETNAMESE_DIACRITIC_STRONG = 0.05;
-
-    /**
-     * Tỷ lệ ký tự mang dấu đủ để NGHIÊNG về tiếng Việt khi không còn bằng chứng nào
-     * khác — dùng làm chốt cuối, sau khi phép đếm từ chức năng đã thất bại cho cả hai
-     * ngôn ngữ. Các ký tự này chỉ xuất hiện trong tiếng Việt, nên dù thưa chúng vẫn
-     * đáng tin hơn {@code <html lang>}.
-     */
+    /** Tỷ lệ ký tự mang dấu đặc trưng tiếng Việt đủ để kết luận là tiếng Việt. */
     private static final double VIETNAMESE_DIACRITIC_THRESHOLD = 0.005;
 
     /** Tỷ lệ token là từ chức năng tiếng Việt đủ để kết luận là tiếng Việt. */
@@ -56,15 +115,34 @@ public class LanguageFilter {
     /** Dưới mức này thì văn bản quá ngắn để kết luận; rơi về {@code <html lang>}. */
     private static final int MIN_TOKENS_FOR_CONTENT_EVIDENCE = 40;
 
+    /**
+     * Ký tự chỉ tiếng Việt mới có, ngoài khối {@code U+1EA0..U+1EF9}.
+     *
+     * <p>Cố ý KHÔNG có {@code â ê ô é à á}: tiếng Pháp, Bồ Đào Nha và Tây Ban
+     * Nha dùng chung, đưa vào sẽ nhận nhầm bài tiếng Pháp thành tiếng Việt.
+     * {@code đ} cũng có trong tiếng Croatia nhưng crawler này không đi tới đó.
+     */
     private static final Set<Character> VIETNAMESE_ONLY_CHARS = Set.of(
             'ơ', 'ư', 'ă', 'đ', 'Ơ', 'Ư', 'Ă', 'Đ');
 
+    /**
+     * Từ chức năng tiếng Việt. Chọn những từ <b>có dấu</b> là chính, vì từ
+     * không dấu ({@code co}, {@code cho}, {@code ra}) trùng với chuỗi ký tự
+     * của nhiều thứ tiếng khác.
+     */
     private static final Set<String> VIETNAMESE_FUNCTION_WORDS = Set.of(
             "của", "và", "là", "được", "trong", "người", "những", "các", "có",
             "không", "cho", "với", "để", "này", "đã", "khi", "một", "đến", "về",
             "như", "từ", "cũng", "thì", "sẽ", "tại", "theo", "đó", "nhiều",
             "năm", "trên", "ở", "vào", "nhưng", "hơn", "phải", "làm", "việc");
 
+    /**
+     * Từ chức năng tiếng Anh.
+     *
+     * <p>Cố ý loại {@code a}, {@code an}, {@code no}, {@code en}, {@code de}
+     * — chúng là từ thường gặp của tiếng Pháp/Tây Ban Nha/Indonesia, giữ lại
+     * sẽ kéo điểm tiếng Anh của các thứ tiếng đó lên qua ngưỡng.
+     */
     private static final Set<String> ENGLISH_FUNCTION_WORDS = Set.of(
             "the", "of", "and", "to", "in", "is", "that", "for", "it", "with",
             "was", "on", "are", "be", "this", "have", "from", "has", "not",
@@ -92,8 +170,19 @@ public class LanguageFilter {
     private final AtomicLong acceptedUndetermined = new AtomicLong();
     private final AtomicLong rejected = new AtomicLong();
 
+    /** Đếm riêng từng ngôn ngữ bị loại — số liệu đưa thẳng vào báo cáo. */
     private final Map<String, AtomicLong> rejectedByLanguage = new ConcurrentHashMap<>();
 
+    /**
+     * Nhánh quyết định của khối: trang này có được vào corpus không?
+     *
+     * <p>Luôn <b>ghi mã ngôn ngữ đã nhận diện vào tài liệu</b>, kể cả khi
+     * loại — tài liệu được giữ thì mang theo nhãn dùng được về sau (lọc kết
+     * quả theo ngôn ngữ, chọn bộ tách từ đúng cho tiếng Anh và tiếng Việt).
+     *
+     * @return {@code true} nếu trang là tiếng Việt, tiếng Anh, hoặc quá ngắn
+     *         để kết luận
+     */
     public boolean accept(WebDocument doc) {
         if (doc == null) {
             return false;
@@ -119,6 +208,15 @@ public class LanguageFilter {
         return true;
     }
 
+    /**
+     * Nhận diện ngôn ngữ của một đoạn văn bản.
+     *
+     * @param declaredLang giá trị {@code <html lang>} đã chuẩn hoá (có thể
+     *                     {@code null}) — chỉ dùng khi bằng chứng nội dung
+     *                     không đủ
+     * @return {@link #VIETNAMESE}, {@link #ENGLISH}, {@link #UNDETERMINED},
+     *         {@link #OTHER_LATIN}, hoặc mã ngôn ngữ của hệ chữ ngoại lai
+     */
     public String detect(String declaredLang, String text) {
         String hint = normalizeLanguageTag(declaredLang);
         if (text == null || text.isBlank()) {
@@ -163,11 +261,7 @@ public class LanguageFilter {
         }
 
         // --- Tầng 2: dấu phụ đặc trưng tiếng Việt ---
-        // Chỉ kết luận ngay khi dấu thanh DÀY ĐẶC. Dấu thanh THƯA thì chưa đủ: một
-        // trang tiếng Anh viết về Việt Nam cũng đạt mức đó chỉ nhờ tên riêng có dấu.
-        // Ca đó được nhường cho tầng 3 phân xử; dấu thanh thưa quay lại làm chốt cuối.
-        double diacriticRatio = (double) vietnameseMarks / letters;
-        if (diacriticRatio >= VIETNAMESE_DIACRITIC_STRONG) {
+        if ((double) vietnameseMarks / letters >= VIETNAMESE_DIACRITIC_THRESHOLD) {
             return VIETNAMESE;
         }
 
@@ -188,13 +282,7 @@ public class LanguageFilter {
             }
         }
         if (total < MIN_TOKENS_FOR_CONTENT_EVIDENCE) {
-            // Quá ngắn để đếm từ chức năng. Dấu thanh dù thưa vẫn là dấu hiệu RIÊNG
-            // của tiếng Việt, đáng tin hơn <html lang> — giữ nguyên hành vi cũ cho
-            // tiêu đề ngắn kiểu "Trang chủ", "Tin tức trong nước".
-            if (diacriticRatio >= VIETNAMESE_DIACRITIC_THRESHOLD) {
-                return VIETNAMESE;
-            }
-            // Không có dấu nào: tin tạm <html lang>, không có thì cho qua.
+            // Quá ngắn để kết luận: tin tạm <html lang>, không có thì cho qua.
             return isViOrEn(hint) ? hint : UNDETERMINED;
         }
         if ((double) viHits / total >= VIETNAMESE_WORD_THRESHOLD) {
@@ -205,17 +293,12 @@ public class LanguageFilter {
                 || (ENGLISH.equals(hint) && englishRatio >= ENGLISH_WORD_THRESHOLD_WITH_HINT)) {
             return ENGLISH;
         }
-        // Chốt cuối: không đủ từ chức năng của CẢ HAI ngôn ngữ, nhưng có dấu thanh.
-        // Đây là trang liệt kê, trang nhiều tên riêng, trang ít văn xuôi tiếng Việt —
-        // tầng 2 cũ bắt được chúng, và chốt này giữ nguyên kết quả đó.
-        if (diacriticRatio >= VIETNAMESE_DIACRITIC_THRESHOLD) {
-            return VIETNAMESE;
-        }
-        // Chữ Latinh, đủ dài, không dấu thanh, không dấu hiệu của cả hai: Pháp, Đức,
+        // Chữ Latinh, đủ dài, mà không có dấu hiệu của cả hai: Pháp, Đức,
         // Indonesia, Tây Ban Nha... — đúng thứ chính sách này loại.
         return OTHER_LATIN;
     }
 
+    /** Rút thẻ ngôn ngữ chính từ {@code <html lang>}: {@code "en-US"} -> {@code "en"}. */
     public static String normalizeLanguageTag(String tag) {
         if (tag == null || tag.isBlank()) {
             return "";
@@ -244,6 +327,7 @@ public class LanguageFilter {
         return acceptedEnglish.get();
     }
 
+    /** Số trang được giữ vì quá ngắn để kết luận ngôn ngữ. */
     public long getAcceptedUndeterminedCount() {
         return acceptedUndetermined.get();
     }
@@ -252,6 +336,7 @@ public class LanguageFilter {
         return rejected.get();
     }
 
+    /** Bảng "ngôn ngữ bị loại -> số trang", sắp giảm dần khi in ra báo cáo. */
     public Map<String, Long> getRejectedByLanguage() {
         Map<String, Long> snapshot = new LinkedHashMap<>();
         rejectedByLanguage.entrySet().stream()
@@ -260,7 +345,7 @@ public class LanguageFilter {
         return snapshot;
     }
 
-    /** Demo*/
+    /** Demo minh hoạ nhỏ để chụp màn hình làm báo cáo. */
     public static void main(String[] args) {
         LanguageFilter filter = new LanguageFilter();
 
@@ -282,5 +367,4 @@ public class LanguageFilter {
         System.out.println("Tiếng Pháp : " + filter.detect("", fr) + "  <- bị loại");
         System.out.println("Trang ngắn : " + filter.detect("en", "Trang chủ") + "  <- theo <html lang>");
     }
-
 }
