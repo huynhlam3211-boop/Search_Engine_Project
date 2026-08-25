@@ -20,34 +20,36 @@ if "%MAX_PAGES%"=="" set "MAX_PAGES=10000"
 if "%MAX_DEPTH%"=="" set "MAX_DEPTH=4"
 if "%OUTPUT%"==""    set "OUTPUT=data/crawled-documents.json"
 
-rem --- Kho anh: runner tu suy ra tu OUTPUT (ImageStorage.pathFor) ---
-set "IMAGES=%OUTPUT%"
-if /i "%IMAGES:~-5%"==".json" set "IMAGES=%IMAGES:~0,-5%"
-set "IMAGES=%IMAGES%.images.json"
-
-cd /d "%~dp0search-engine" 2>nul
+cd /d "%~dp0backend" 2>nul
 if errorlevel 1 (
-    echo [LOI] Khong tim thay thu muc "%~dp0search-engine".
-    echo       File .bat nay phai nam o THU MUC GOC cua repo, canh docker-compose.yml.
+    echo [LỖI] Không tìm thấy thư mục "%~dp0backend".
+    echo       Tệp .bat này phải nằm ở THƯ MỤC GỐC của kho, cạnh docker-compose.yml.
     goto :fail
 )
 
 if not exist "pom.xml" (
-    echo [LOI] Khong thay pom.xml trong "%CD%".
-    echo       Thu muc search-engine co ve khong day du.
+    echo [LỖI] Không thấy pom.xml trong "%CD%".
+    echo       Thư mục backend có vẻ không đầy đủ.
+    goto :fail
+)
+
+if not exist "libs\core-crawler\pom.xml" (
+    echo [LỖI] Không thấy module "libs\core-crawler" - nơi chứa các runner crawl.
+    echo       Module này tách ra từ "libs\core" cũ; nếu kho của bạn vẫn còn
+    echo       "libs\core" thì hãy kéo bản mới nhất về.
     goto :fail
 )
 
 set "MVNW=%CD%\mvnw.cmd"
 if not exist "%MVNW%" (
-    echo [LOI] Khong thay Maven Wrapper ^(mvnw.cmd^) trong "%CD%".
+    echo [LỖI] Không thấy Maven Wrapper ^(mvnw.cmd^) trong "%CD%".
     goto :fail
 )
 
 where java >nul 2>nul
 if errorlevel 1 (
-    echo [LOI] Khong tim thay Java.
-    echo       Can JDK 17 tro len - cai tai https://adoptium.net roi mo lai cua so nay.
+    echo [LỖI] Không tìm thấy Java.
+    echo       Cần JDK 17 trở lên - cài tại https://adoptium.net rồi mở lại cửa sổ này.
     goto :fail
 )
 for /f "delims=" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do (
@@ -57,69 +59,65 @@ for /f "delims=" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do (
 :java_done
 
 echo.
-echo === CRAWL DA DOMAIN ===
-echo So trang toi da : %MAX_PAGES%
-echo Do sau toi da   : %MAX_DEPTH%
-echo Ngon ngu        : CHI tieng Viet va tieng Anh
-echo Tep dau ra      : %OUTPUT%
-echo Tep anh         : %IMAGES%
+echo === CRAWL ĐA DOMAIN ===
+echo Số trang tối đa : %MAX_PAGES%
+echo Độ sâu tối đa   : %MAX_DEPTH%
+echo Ngôn ngữ        : CHỈ tiếng Việt và tiếng Anh
+echo Tệp đầu ra      : %OUTPUT%
 
-rem --- Corpus cu: noi tiep hay xoa lam lai ---
 if /i "%FRESH%"=="--fresh" goto :ask_fresh
 
 if exist "%OUTPUT%" (
-    echo Che do          : NOI TIEP corpus san co ^(khong tai lai trang da co^)
+    echo Chế độ          : NỐI TIẾP corpus sẵn có ^(không tải lại trang đã có^)
 ) else (
-    echo Che do          : crawl moi ^(chua co corpus nao tai duong dan nay^)
+    echo Chế độ          : crawl mới ^(chưa có corpus nào tại đường dẫn này^)
 )
 set "EXEC_ARGS=%MAX_PAGES% %MAX_DEPTH% %OUTPUT%"
 goto :run
 
 :ask_fresh
 if not exist "%OUTPUT%" (
-    echo Che do          : --fresh ^(chua co corpus cu nen khong mat gi^)
+    echo Chế độ          : --fresh ^(chưa có corpus cũ nên không mất gì^)
     set "EXEC_ARGS=%MAX_PAGES% %MAX_DEPTH% %OUTPUT% --fresh"
     goto :run
 )
-echo Che do          : --fresh - XOA corpus cu va crawl lai tu dau
+echo Chế độ          : --fresh - XOÁ corpus cũ và crawl lại từ đầu
 echo.
-echo [CANH BAO] "%OUTPUT%" dang ton tai va se bi GHI DE.
-echo            Toan bo cong crawl cua cac phien truoc se mat.
+echo [CẢNH BÁO] "%OUTPUT%" đang tồn tại và sẽ bị GHI ĐÈ.
+echo            Toàn bộ công crawl của các phiên trước sẽ mất.
 echo.
 set "CONFIRM="
-set /p "CONFIRM=Go XOA roi Enter de xac nhan, hoac Enter de huy: "
+set /p "CONFIRM=Gõ XOA rồi Enter để xác nhận, hoặc Enter để huỷ: "
 if /i not "%CONFIRM%"=="XOA" (
     echo.
-    echo Da huy. Khong co gi bi thay doi.
+    echo Đã huỷ. Không có gì bị thay đổi.
     goto :fail
 )
 set "EXEC_ARGS=%MAX_PAGES% %MAX_DEPTH% %OUTPUT% --fresh"
 
 :run
 echo.
-echo Dang bien dich va chay crawler... ^(Ctrl+C de dung - checkpoint moi 250 trang^)
+echo Đang biên dịch và chạy crawler...
+echo   Ctrl+C để dừng. Điểm kiểm tra ghi mỗi max^(250 trang, 25%% corpus hiện có^),
+echo   nên ở corpus lớn có thể mất vài nghìn trang cuối.
 echo.
-call "%MVNW%" -q compile exec:java -Dexec.mainClass=%RUNNER% -Dexec.args="%EXEC_ARGS%" -Dcrawl.progress=%CRAWL_PROGRESS%
+call "%MVNW%" -q -pl libs/core-crawler -am compile exec:java -Dexec.mainClass=%RUNNER% -Dexec.args="%EXEC_ARGS%" -Dcrawl.progress=%CRAWL_PROGRESS%
 if errorlevel 1 (
     echo.
-    echo [LOI] Phien crawl ket thuc bat thuong.
-    echo       Cuon len xem thong bao loi cua Maven/crawler o tren.
-    echo       Phan da crawl toi diem kiem tra gan nhat van nam trong "%OUTPUT%".
+    echo [LỖI] Phiên crawl kết thúc bất thường.
+    echo       Cuộn lên xem thông báo lỗi của Maven/crawler ở trên.
+    echo       Phần đã crawl tới điểm kiểm tra gần nhất vẫn nằm trong "%OUTPUT%".
     goto :fail
 )
 
 echo.
-echo Xong.
-echo   Corpus : "%CD%\%OUTPUT%"
-echo   Kho anh: "%CD%\%IMAGES%"
+echo Xong. Corpus đã lưu tại "%CD%\%OUTPUT%".
+echo Muốn kết quả vào bộ tìm kiếm thì khởi động lại backend, hoặc gọi:
+echo     curl -X POST -H "X-API-Key: khoa-trong-.env" http://localhost:8083/api/admin/reindex
+echo   ^(gọi thẳng crawler-service :8083. Qua Gateway :8080 thì tuyến
+echo   /api/admin/** đòi token JWT có vai trò ADMIN, không nhận X-API-Key.^)
 echo.
-echo Xem thong ke corpus vua crawl:
-echo     crawl-stats.bat "search-engine/%OUTPUT%"
-echo.
-echo Muon ket qua vao bo tim kiem thi khoi dong lai backend, hoac goi:
-echo     curl -X POST http://localhost:8080/api/admin/reindex
-echo.
-echo Nhan phim bat ky de dong...
+echo Nhấn phím bất kỳ để đóng...
 pause >nul
 call :restore_cp
 endlocal
@@ -127,7 +125,7 @@ exit /b 0
 
 :fail
 echo.
-echo Nhan phim bat ky de dong...
+echo Nhấn phím bất kỳ để đóng...
 pause >nul
 call :restore_cp
 endlocal

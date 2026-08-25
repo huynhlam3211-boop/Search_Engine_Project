@@ -5,10 +5,14 @@ set "ROOT=%~dp0"
 set "ENV_FILE=%ROOT%.env"
 
 set "MODE=full"
-set "PROFILES=--profile kafka --profile monitoring"
-set "BUS=kafka"
-set "BUILD=--build"
-set "FOLLOW_LOGS="
+set "USE_DOCKER="
+set "FORCE_BUILD="
+set "SHOW_WINDOWS="
+set "NO_FRONTEND="
+
+for /f "tokens=2 delims=:" %%c in ('chcp') do set "OLD_CP=%%c"
+set "OLD_CP=%OLD_CP: =%"
+chcp 65001 >nul
 
 :parse
 if "%~1"=="" goto :parsed
@@ -16,22 +20,18 @@ if /i "%~1"=="--help" goto :usage
 if /i "%~1"=="-h" goto :usage
 if /i "%~1"=="--full" (
     set "MODE=full"
-    set "PROFILES=--profile kafka --profile monitoring"
-    set "BUS=kafka"
-) else if /i "%~1"=="--kafka" (
-    set "MODE=kafka"
-    set "PROFILES=--profile kafka"
-    set "BUS=kafka"
 ) else if /i "%~1"=="--core" (
     set "MODE=core"
-    set "PROFILES="
-    set "BUS=memory"
-) else if /i "%~1"=="--no-build" (
-    set "BUILD="
-) else if /i "%~1"=="--logs" (
-    set "FOLLOW_LOGS=1"
+) else if /i "%~1"=="--docker" (
+    set "USE_DOCKER=1"
+) else if /i "%~1"=="--build" (
+    set "FORCE_BUILD=1"
+) else if /i "%~1"=="--windows" (
+    set "SHOW_WINDOWS=1"
+) else if /i "%~1"=="--no-frontend" (
+    set "NO_FRONTEND=1"
 ) else (
-    echo [LOI] Tham so khong hieu: %~1
+    echo [LỖI] Tham số không hiểu: %~1
     echo.
     goto :usage_fail
 )
@@ -39,272 +39,471 @@ shift
 goto :parse
 :parsed
 
-for /f "tokens=2 delims=:" %%c in ('chcp') do set "OLD_CP=%%c"
-set "OLD_CP=%OLD_CP: =%"
-chcp 65001 >nul
-
-rem --- Thu muc goc ---
 cd /d "%ROOT%" 2>nul
 if not exist "docker-compose.yml" (
-    echo [LOI] Khong thay docker-compose.yml trong "%CD%".
-    echo       File .bat nay phai nam o THU MUC GOC cua repo.
+    echo [LỖI] Không thấy docker-compose.yml trong "%CD%".
+    echo       Tệp .bat này phải nằm ở THƯ MỤC GỐC của kho.
+    goto :fail
+)
+if not exist "backend\pom.xml" (
+    echo [LỖI] Không thấy "backend\pom.xml".
+    echo       Thư mục backend của kho có vẻ không đầy đủ.
     goto :fail
 )
 
-rem ===========================================================================
-rem DOCKER
-rem ===========================================================================
+if defined ADMIN_API_KEY goto :key_ok
+if not exist "%ENV_FILE%" goto :key_new
+for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+    if /i "%%a"=="ADMIN_API_KEY" set "ADMIN_API_KEY=%%b"
+)
+if defined ADMIN_API_KEY (
+    echo Khoá quản trị      : đọc từ "%ENV_FILE%"
+    goto :key_ok
+)
+
+:key_new
+echo Khoá quản trị      : chưa có, đang sinh khoá mới...
+for /f "delims=" %%k in ('powershell -NoProfile -Command "$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ([BitConverter]::ToString($b) -replace [char]45, [string]::Empty).ToLower()"') do set "ADMIN_API_KEY=%%k"
+if not defined ADMIN_API_KEY (
+    echo [LỖI] Không sinh được khoá vì không gọi được PowerShell.
+    echo       Đặt tay rồi chạy lại:
+    echo           set ADMIN_API_KEY=mot-chuoi-bat-ky-tu-16-ky-tu-tro-len
+    goto :fail
+)
+if not exist "%ENV_FILE%" (
+    >"%ENV_FILE%" echo # Sinh tự động bởi run-backend.bat. KHÔNG commit - .gitignore đã chặn.
+)
+>>"%ENV_FILE%" echo ADMIN_API_KEY=%ADMIN_API_KEY%
+echo                      đã ghi vào "%ENV_FILE%"
+
+:key_ok
+set "KEY_PROBE=%ADMIN_API_KEY:~15,1%"
+if not defined KEY_PROBE (
+    echo [LỖI] ADMIN_API_KEY ngắn hơn 16 ký tự nên ServiceSecurityConfig sẽ từ chối khởi động.
+    echo       Sửa dòng ADMIN_API_KEY trong "%ENV_FILE%", hoặc xoá hẳn dòng đó
+    echo       để tệp này sinh lại khoá mới.
+    goto :fail
+)
+
+if defined BOOTSTRAP_ADMIN_PASSWORD goto :pw_ok
+if not exist "%ENV_FILE%" goto :pw_new
+for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+    if /i "%%a"=="BOOTSTRAP_ADMIN_PASSWORD" set "BOOTSTRAP_ADMIN_PASSWORD=%%b"
+)
+if defined BOOTSTRAP_ADMIN_PASSWORD (
+    echo Tài khoản quản trị : đọc từ "%ENV_FILE%"
+    goto :pw_ok
+)
+
+:pw_new
+for /f "delims=" %%k in ('powershell -NoProfile -Command "$b = New-Object byte[] 12; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ([BitConverter]::ToString($b) -replace [char]45, [string]::Empty).ToLower()"') do set "BOOTSTRAP_ADMIN_PASSWORD=%%k"
+if not defined BOOTSTRAP_ADMIN_PASSWORD (
+    echo [LỖI] Không sinh được BOOTSTRAP_ADMIN_PASSWORD.
+    echo       Đặt tay rồi chạy lại: set BOOTSTRAP_ADMIN_PASSWORD=...
+    goto :fail
+)
+if not exist "%ENV_FILE%" (
+    >"%ENV_FILE%" echo # Sinh tự động bởi run-backend.bat. KHÔNG commit - .gitignore đã chặn.
+)
+>>"%ENV_FILE%" echo BOOTSTRAP_ADMIN_USERNAME=admin
+>>"%ENV_FILE%" echo BOOTSTRAP_ADMIN_PASSWORD=%BOOTSTRAP_ADMIN_PASSWORD%
+echo Tài khoản quản trị : admin / %BOOTSTRAP_ADMIN_PASSWORD%   ^(đã ghi vào .env^)
+
+:pw_ok
+if not defined BOOTSTRAP_ADMIN_USERNAME set "BOOTSTRAP_ADMIN_USERNAME=admin"
+
+if defined USE_DOCKER goto :docker_path
+
+where java >nul 2>nul
+if errorlevel 1 (
+    echo [LỖI] Không tìm thấy Java.
+    echo       Cần JDK 17 trở lên - cài tại https://adoptium.net rồi mở lại cửa sổ này.
+    goto :fail
+)
+
+set "NEED_BUILD="
+if defined FORCE_BUILD set "NEED_BUILD=1"
+call :need_jar api-gateway
+call :need_jar auth-service
+call :need_jar search-service
+if "%MODE%"=="full" (
+    call :need_jar crawler-service
+    call :need_jar analytics-service
+    call :need_jar history-service
+    call :need_jar downloads-service
+    call :need_jar settings-service
+    call :need_jar football-service
+)
+
+if not defined NEED_BUILD goto :build_done
+echo.
+echo Đang dựng jar cho toàn bộ reactor... ^(lần đầu mất vài phút^)
+echo.
+pushd "%ROOT%backend"
+call mvnw.cmd -B clean package -DskipTests
+set "BUILD_ERR=%errorlevel%"
+popd
+if not "%BUILD_ERR%"=="0" (
+    echo.
+    echo [LỖI] Dựng Maven thất bại. Cuộn lên xem thông báo lỗi ĐẦU TIÊN.
+    goto :fail
+)
+:build_done
+
+set "PORT_BUSY="
+call :check_port 8080
+call :check_port 8081
+call :check_port 8082
+if "%MODE%"=="full" (
+    call :check_port 8083
+    call :check_port 8084
+    call :check_port 8085
+    call :check_port 8086
+    call :check_port 8087
+    call :check_port 8090
+)
+if defined PORT_BUSY (
+    echo.
+    echo [LỖI] Còn tiến trình cũ đang giữ cổng. Chạy end-backend.bat rồi thử lại.
+    goto :fail
+)
+
+set "AUTH_SERVICE_URL=http://localhost:8081"
+set "SEARCH_SERVICE_URL=http://localhost:8082"
+set "CRAWLER_SERVICE_URL=http://localhost:8083"
+set "ANALYTICS_SERVICE_URL=http://localhost:8084"
+set "HISTORY_SERVICE_URL=http://localhost:8085"
+set "DOWNLOADS_SERVICE_URL=http://localhost:8086"
+set "SETTINGS_SERVICE_URL=http://localhost:8087"
+set "FOOTBALL_SERVICE_URL=http://localhost:8090"
+set "AUTH_ISSUER_URI=http://localhost:8081"
+set "AUTH_JWKS_URI=http://localhost:8081/oauth2/jwks"
+set "REDIS_HOST=localhost"
+
+if exist "%ENV_FILE%" (
+    for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+        if not defined %%a set "%%a=%%b"
+    )
+)
+if not defined POSTGRES_PASSWORD set "POSTGRES_PASSWORD=vnsearch"
+
+if /i "%APP_CRAWLER_BUS%"=="kafka" (
+    set "KAFKA_UP="
+    for /f "tokens=5" %%p in ('netstat -ano -p TCP ^| findstr /r /c:":9092 .*LISTENING"') do set "KAFKA_UP=1"
+    if not defined KAFKA_UP (
+        echo Bus crawl          : .env ghi kafka nhưng cổng 9092 trống - tạm dùng memory
+        set "APP_CRAWLER_BUS=memory"
+    )
+)
+if not defined AUTH_DB_PASSWORD      set "AUTH_DB_PASSWORD=%POSTGRES_PASSWORD%"
+if not defined DOWNLOADS_DB_PASSWORD set "DOWNLOADS_DB_PASSWORD=%POSTGRES_PASSWORD%"
+if not defined SETTINGS_DB_PASSWORD  set "SETTINGS_DB_PASSWORD=%POSTGRES_PASSWORD%"
+
+set "AUTH_DB_URL=jdbc:postgresql://localhost:5432/vnsearch_auth"
+set "DOWNLOADS_DB_URL=jdbc:postgresql://localhost:5432/vnsearch_downloads"
+set "SETTINGS_DB_URL=jdbc:postgresql://localhost:5432/vnsearch_settings"
+set "APP_STORAGE_POSTGRES_URL=jdbc:postgresql://localhost:5432/vnsearch"
+set "FOOTBALL_DB_HOST=localhost"
+set "MONGO_URI=mongodb://localhost:27017/vnsearch_history"
+
+if "%MODE%"=="core" set "MODE_SHOW=RÚT GỌN - api-gateway + auth-service + search-service"
+if "%MODE%"=="full" set "MODE_SHOW=ĐẦY ĐỦ - cả 9 service Java"
+
+echo.
+echo === VNSEARCH - CHẠY TRỰC TIẾP BẰNG JAR ===
+echo Thư mục            : %CD%
+echo Chế độ             : %MODE_SHOW%
+echo Khoá quản trị      : %ADMIN_API_KEY:~0,8%...   ^(đầy đủ trong .env^)
+echo.
+
+echo === HẠ TẦNG ===
+set "INFRA_LIST="
+call :need_infra 5432 PostgreSQL postgres
+call :need_infra 6379 Redis redis
+call :need_infra 27017 MongoDB mongo
+if not defined INFRA_LIST goto :infra_ok
+
+echo.
+echo Đang bật phần hạ tầng còn thiếu bằng Docker...
 where docker >nul 2>nul
 if errorlevel 1 (
-    echo [LOI] Khong tim thay lenh `docker`.
-    echo       Cai Docker Desktop tai https://docker.com/products/docker-desktop
-    echo       roi MO LAI cua so nay ^(PATH chi duoc nap luc mo terminal^).
-    goto :fail
-)
-
-docker compose version >nul 2>nul
-if errorlevel 1 (
-    echo [LOI] Docker co, nhung khong co plugin `docker compose` ^(v2^).
-    echo       Ban Docker Desktop qua cu. Cap nhat len ban moi nhat.
+    echo [LỖI] Thiếu PostgreSQL/Redis/MongoDB mà máy lại không có lệnh docker.
+    echo       Cài Docker Desktop tại https://docker.com, hoặc tự dựng ba dịch vụ
+    echo       đó ở cổng 5432/6379/27017 rồi chạy lại tệp này.
     goto :fail
 )
 
 docker info >nul 2>nul
-if not errorlevel 1 goto :docker_ready
-
-echo Docker Desktop chua chay - dang bat...
+if not errorlevel 1 goto :infra_up
 
 set "DOCKER_DESKTOP=%ProgramFiles%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP%" set "DOCKER_DESKTOP=%ProgramW6432%\Docker\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP%" set "DOCKER_DESKTOP=%LocalAppData%\Docker\Docker Desktop.exe"
 if not exist "%DOCKER_DESKTOP%" (
-    echo [LOI] Khong tim thay Docker Desktop.exe o cac vi tri quen thuoc.
-    echo       Mo Docker Desktop bang tay, doi bieu tuong ca voi xanh, roi chay lai.
+    echo [LỖI] Docker engine chưa chạy và không tìm thấy Docker Desktop.exe để mở.
+    echo       Mở Docker Desktop bằng tay rồi chạy lại tệp này.
     goto :fail
 )
 
+echo   Docker engine chưa chạy - đang mở Docker Desktop...
 start "" "%DOCKER_DESKTOP%"
-
-rem loi socket kho hieu.
-set /a DOCKER_WAIT=0
+set /a DD_WAIT=0
 :wait_docker
 ping -n 4 127.0.0.1 >nul
 docker info >nul 2>nul
-if not errorlevel 1 goto :docker_started
-set /a DOCKER_WAIT+=3
-if %DOCKER_WAIT% GEQ 240 (
-    echo.
-    echo [LOI] Doi 4 phut ma Docker engine van chua san sang.
-    echo       Mo Docker Desktop xem no bao gi ^(hay gap: WSL2 chua cai, hoac
-    echo       Virtualization tat trong BIOS^).
+if not errorlevel 1 goto :docker_ready
+set /a DD_WAIT+=3
+if %DD_WAIT% GEQ 180 (
+    echo [LỖI] Đợi 3 phút mà Docker engine vẫn chưa sẵn sàng.
+    echo       Mở Docker Desktop và xem nó báo gì, rồi chạy lại tệp này.
     goto :fail
 )
-echo    ... %DOCKER_WAIT%s
+echo    ... %DD_WAIT%s
 goto :wait_docker
-
-:docker_started
-echo Docker Desktop da san sang sau %DOCKER_WAIT%s.
-
 :docker_ready
+echo   Docker engine sẵn sàng sau %DD_WAIT%s.
 
-rem ===========================================================================
-rem KHOA QUAN TRI
-rem ===========================================================================
-if defined ADMIN_API_KEY goto :key_ok
-if not exist "%ENV_FILE%" goto :key_new
-
-for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
-    if /i "%%a"=="ADMIN_API_KEY" set "ADMIN_API_KEY=%%b"
-)
-if defined ADMIN_API_KEY (
-    echo Khoa quan tri : doc tu "%ENV_FILE%"
-    goto :key_ok
-)
-
-:key_new
-echo Khoa quan tri : chua co, dang sinh khoa moi...
-for /f "delims=" %%k in ('powershell -NoProfile -Command "$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ([BitConverter]::ToString($b) -replace [char]45, [string]::Empty).ToLower()"') do set "ADMIN_API_KEY=%%k"
-if not defined ADMIN_API_KEY (
-    echo [LOI] Khong sinh duoc khoa ^(khong goi duoc PowerShell^).
-    echo       Dat tay roi chay lai:
-    echo           set ADMIN_API_KEY=mot-chuoi-bat-ky-tu-16-ky-tu-tro-len
-    goto :fail
-)
-if not exist "%ENV_FILE%" (
-    >"%ENV_FILE%" echo # Sinh tu dong boi run-backend.bat. KHONG commit - .gitignore da chan.
-)
->>"%ENV_FILE%" echo ADMIN_API_KEY=%ADMIN_API_KEY%
-echo                 da ghi vao "%ENV_FILE%" ^(tep nay khong len Git^)
-
-:key_ok
-set "KEY_PROBE=%ADMIN_API_KEY:~15,1%"
-if not defined KEY_PROBE (
-    echo [LOI] ADMIN_API_KEY ngan hon 16 ky tu nen SecurityConfig se tu choi khoi dong.
-    echo       Sua gia tri ADMIN_API_KEY trong "%ENV_FILE%", hoac xoa han dong do
-    echo       de file nay sinh lai khoa moi.
-    goto :fail
-)
-
-rem ===========================================================================
-rem BUS SU KIEN
-rem ===========================================================================
-
-set "APP_CRAWLER_BUS=%BUS%"
-
-rem ===========================================================================
-rem CHAY
-rem ===========================================================================
-if "%MODE%"=="full"  set "MODE_SHOW=FULL - backend + postgres + kafka + monitoring, ~4 GB RAM"
-if "%MODE%"=="kafka" set "MODE_SHOW=KAFKA - backend + postgres + cum Kafka, ~3 GB RAM"
-if "%MODE%"=="core"  set "MODE_SHOW=CORE - backend + postgres, ~1,5 GB RAM"
-
-set "BUILD_SHOW=co - build lai anh tu ma nguon"
-if not defined BUILD set "BUILD_SHOW=khong - dung anh da co, do co --no-build"
-
-echo.
-echo === VNSEARCH ===
-echo Thu muc      : %CD%
-echo Che do       : %MODE_SHOW%
-echo Build        : %BUILD_SHOW%
-echo Bus crawler  : %APP_CRAWLER_BUS%
-echo Khoa quan tri: %ADMIN_API_KEY:~0,8%... ^(day du trong .env^)
-set "INDEX_STALE="
-if not exist "search-engine\data\index.json" goto :stale_done
-if not exist "search-engine\data\crawled-documents.json" goto :stale_done
-for /f "delims=" %%s in ('powershell -NoProfile -Command "if ((Get-Item search-engine\data\index.json).LastWriteTime -lt (Get-Item search-engine\data\crawled-documents.json).LastWriteTime) { Write-Output STALE }"') do set "INDEX_STALE=%%s"
-if not defined INDEX_STALE goto :stale_done
-echo [CANH BAO] data\index.json CU HON data\crawled-documents.json.
-echo            Backend se nap chi muc cu, nen cac trang crawl gan day chua tim
-echo            duoc. Sau khi backend len, lap lai chi muc mot lan:
-echo                curl -X POST -H "X-API-Key: %ADMIN_API_KEY:~0,8%..." http://localhost:8080/api/admin/reindex
-:stale_done
-
-set "STALE_LIST="
-for /f "delims=" %%c in ('docker compose %PROFILES% ps -a --format "{{.Name}}" 2^>nul') do call :check_net %%c
-if defined STALE_LIST (
-    echo.
-    echo Don container mac ket o mang cu:%STALE_LIST%
-    docker rm -f %STALE_LIST% >nul 2>nul
-)
-
-echo.
-echo Dang build va khoi dong... ^(lan dau tai anh nen mat vai phut^)
-echo.
-
-docker compose %PROFILES% up -d %BUILD%
+:infra_up
+docker compose up -d%INFRA_LIST%
 if errorlevel 1 (
     echo.
-    echo [LOI] `docker compose up` that bai. Cuon len xem dong loi DAU TIEN -
-    echo       phan con lai thuong chi la he qua. Vai nguyen nhan hay gap:
-    echo         - port is already allocated : con mot ban cu dang chay.
-    echo                                       Chay end-backend.bat roi thu lai.
-    echo         - no space left on device   : docker system prune -a
-    echo         - build that bai o buoc mvn : loi bien dich that trong ma nguon
+    echo [LỖI] Không bật được%INFRA_LIST%. Cuộn lên xem dòng lỗi ĐẦU TIÊN.
     goto :fail
 )
 
+echo   Đang đợi container báo healthy...
+set "INFRA_ERR="
+call :wait_health postgres PostgreSQL
+call :wait_health redis Redis
+call :wait_health mongo MongoDB
+if defined INFRA_ERR (
+    echo       Xem log: docker compose logs%INFRA_LIST%
+    goto :fail
+)
+echo   Hạ tầng đã sẵn sàng.
+:infra_ok
 echo.
-echo Container da tao. Dang doi backend nap chi muc...
-set /a HEALTH_WAIT=0
-:wait_backend
-set "HEALTH="
-for /f "delims=" %%s in ('docker inspect -f "{{.State.Health.Status}}" vnsearch-backend 2^>nul') do set "HEALTH=%%s"
-if "%HEALTH%"=="healthy" goto :backend_up
-if "%HEALTH%"=="" (
-    echo [CANH BAO] Khong doc duoc trang thai container vnsearch-backend.
-    goto :backend_unknown
-)
-set /a HEALTH_WAIT+=5
-if %HEALTH_WAIT% GEQ 420 (
-    echo.
-    echo [CANH BAO] Doi 7 phut ma backend van "%HEALTH%".
-    echo            Xem no ket o dau : docker compose logs -f backend
-    goto :backend_unknown
-)
-ping -n 6 127.0.0.1 >nul
-echo    ... %HEALTH_WAIT%s ^(%HEALTH%^)
-goto :wait_backend
 
-:backend_up
-echo Backend san sang sau %HEALTH_WAIT%s.
-:backend_unknown
+cd /d "%ROOT%backend"
+if not exist "logs" mkdir "logs"
 
-echo.
-docker compose %PROFILES% ps
-echo.
-echo === DIA CHI ===
-echo   Backend API   http://localhost:8080/api/health
-echo   Thu tim kiem  http://localhost:8080/api/search?q=ha+noi
-if not "%MODE%"=="core" (
-    echo   Kafka UI      http://localhost:8081
-)
+set "LAUNCH_ERR="
+call :launch api-gateway 8080
+call :launch auth-service 8081
+call :launch search-service 8082
 if "%MODE%"=="full" (
-    echo   Grafana       http://localhost:3000    admin / xem GRAFANA_PASSWORD trong .env
-    echo   Prometheus    http://localhost:9090
-    echo   Alertmanager  http://localhost:9093
+    call :launch crawler-service 8083
+    call :launch analytics-service 8084
+    call :launch history-service 8085
+    call :launch downloads-service 8086
+    call :launch settings-service 8087
+    call :launch football-service 8090
 )
-echo.
-echo   Giao dien     chay run-frontend.bat o mot cua so khac
-echo   Xem log       docker compose logs -f backend
-echo   TAT HET       end-backend.bat        ^<-- nho chay de tra lai RAM
-echo.
+if defined LAUNCH_ERR goto :fail
 
-if defined FOLLOW_LOGS (
-    echo Dang bam theo log backend. Ctrl+C de thoat - container VAN CHAY tiep.
-    echo.
-    docker compose logs -f backend
+echo.
+echo Đang đợi api-gateway trả lời...
+set /a HEALTH_WAIT=0
+:wait_gw
+ping -n 4 127.0.0.1 >nul
+set "GW_UP="
+for /f "delims=" %%s in ('powershell -NoProfile -Command "try { if ((Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://localhost:8080/actuator/health).StatusCode -eq 200) { 'UP' } } catch { }"') do set "GW_UP=%%s"
+if "%GW_UP%"=="UP" goto :gw_ready
+set /a HEALTH_WAIT+=3
+if %HEALTH_WAIT% GEQ 180 (
+    echo [CẢNH BÁO] Đợi 3 phút mà api-gateway vẫn chưa trả lời.
+    echo            Xem cửa sổ console của từng service để biết nó kẹt ở đâu.
+    goto :gw_done
 )
+echo    ... %HEALTH_WAIT%s
+goto :wait_gw
 
+:gw_ready
+echo api-gateway sẵn sàng sau %HEALTH_WAIT%s.
+:gw_done
+
+echo.
+echo === ĐỊA CHỈ ===
+echo   Cổng duy nhất   http://localhost:8080
+echo   Kiểm tra sống   http://localhost:8080/actuator/health
+echo   Thử tìm kiếm    http://localhost:8080/api/search?q=ha+noi
+echo   Swagger UI      http://localhost:8080/swagger-ui.html
+echo.
+echo   Giao diện       mở tự động ở cửa sổ riêng ^(tắt bằng --no-frontend^)
+echo   Bóng đá         qua Gateway: http://localhost:8080/api/football/v1/fixtures
+echo   Đo corpus       crawl-stats.bat
+echo   Log service     backend\logs\^<ten-service^>.log
+echo   TẮT HẾT         end-backend.bat
+echo.
+echo   PostgreSQL, Redis và MongoDB được tệp này tự bật bằng Docker nếu cổng
+echo   5432/6379/27017 còn trống, và Docker Desktop cũng được mở giúp.
+echo.
+echo   Muốn cả giám sát Prometheus/Grafana thì dùng run-backend.bat --docker.
+echo.
+if defined NO_FRONTEND goto :fe_done
+echo Đang mở giao diện ở cửa sổ riêng...
+start "VnSearch giao dien" cmd /k "%ROOT%run-frontend.bat"
+:fe_done
 call :restore_cp
 endlocal
 exit /b 0
 
-:check_net
-set "NETS="
-for /f "delims=" %%n in ('docker inspect -f "{{range .NetworkSettings.Networks}}{{.NetworkID}} {{end}}" %1 2^>nul') do set "NETS=%%n"
-if not defined NETS goto :eof
-for %%i in (%NETS%) do (
-    rem `network inspect` HOI daemon nen day la phep thu that. Dinh danh cua mot
-    rem mang da xoa khong con tra loi duoc, va do la toan bo phep thu.
-    docker network inspect %%i >nul 2>nul
-    if errorlevel 1 goto :net_stale
+:docker_path
+where docker >nul 2>nul
+if errorlevel 1 (
+    echo [LỖI] Không tìm thấy lệnh docker.
+    echo       Cài Docker Desktop, hoặc bỏ tham số --docker để chạy jar trực tiếp.
+    goto :fail
 )
+docker info >nul 2>nul
+if errorlevel 1 (
+    echo [LỖI] Docker engine chưa chạy. Mở Docker Desktop rồi thử lại.
+    goto :fail
+)
+
+if "%MODE%"=="core" (
+    echo.
+    echo [GHI CHÚ] --docker luôn bật TOÀN BỘ hệ thống. Tham số --core/--full chỉ
+    echo           có tác dụng khi chạy jar trực tiếp.
+)
+
+echo.
+echo === VNSEARCH - DOCKER COMPOSE ===
+echo Chế độ             : TOÀN BỘ - 9 service + Postgres/Redis/Mongo
+echo                      + Prometheus/Grafana/Alertmanager
+echo Bộ nhớ             : khoảng 4 GB lúc không tải
+echo.
+docker compose up -d --build
+if errorlevel 1 (
+    echo.
+    echo [LỖI] docker compose up thất bại. Cuộn lên xem dòng lỗi ĐẦU TIÊN.
+    goto :fail
+)
+echo.
+docker compose ps
+echo.
+echo   Cổng duy nhất   http://localhost:8080
+echo   Grafana         http://localhost:3000   ^(admin / admin^)
+echo   Prometheus      http://localhost:9090
+echo   Alertmanager    http://localhost:9093
+echo   Xem log         docker compose logs -f api-gateway
+echo   Thêm Kafka      docker compose --profile kafka up -d
+echo   Kafka UI        http://localhost:8091   ^(chỉ khi bật hồ sơ kafka^)
+echo   TẮT HẾT         end-backend.bat
+echo.
+if defined NO_FRONTEND goto :fe_done_docker
+echo Đang mở giao diện ở cửa sổ riêng...
+start "VnSearch giao dien" cmd /k "%ROOT%run-frontend.bat"
+:fe_done_docker
+call :restore_cp
+endlocal
+exit /b 0
+
+:need_infra
+set "INFRA_PID="
+for /f "tokens=5" %%p in ('netstat -ano -p TCP ^| findstr /r /c:":%~1 .*LISTENING"') do set "INFRA_PID=%%p"
+if defined INFRA_PID (
+    echo   %~2 :%~1 - đã chạy
+    goto :eof
+)
+echo   %~2 :%~1 - chưa chạy
+set "INFRA_LIST=%INFRA_LIST% %~3"
 goto :eof
 
-:net_stale
-set "STALE_LIST=%STALE_LIST% %1"
+:wait_health
+set /a WH_WAIT=0
+:wait_health_loop
+set "WH_STATE="
+for /f "delims=" %%h in ('docker inspect -f "{{.State.Health.Status}}" vnsearch-%~1 2^>nul') do set "WH_STATE=%%h"
+if not defined WH_STATE goto :eof
+if "%WH_STATE%"=="healthy" goto :eof
+ping -n 3 127.0.0.1 >nul
+set /a WH_WAIT+=2
+if %WH_WAIT% GEQ 150 (
+    echo   [LỖI] %~2 vẫn ở trạng thái "%WH_STATE%" sau 150 giây.
+    set "INFRA_ERR=1"
+    goto :eof
+)
+goto :wait_health_loop
+
+:need_jar
+if not exist "%ROOT%backend\services\%~1\target\%~1-0.0.1-SNAPSHOT.jar" set "NEED_BUILD=1"
 goto :eof
 
-rem ===========================================================================
+:check_port
+set "PORT_PID="
+for /f "tokens=5" %%p in ('netstat -ano -p TCP ^| findstr /r /c:":%~1 .*LISTENING"') do set "PORT_PID=%%p"
+if not defined PORT_PID goto :eof
+echo [LỖI] Cổng %~1 đang bị tiến trình PID %PORT_PID% chiếm.
+set "PORT_BUSY=1"
+goto :eof
+
+:launch
+if not exist "services\%~1\target\%~1-0.0.1-SNAPSHOT.jar" (
+    echo [LỖI] Chưa có "services\%~1\target\%~1-0.0.1-SNAPSHOT.jar".
+    echo       Chạy lại với tham số --build.
+    set "LAUNCH_ERR=1"
+    goto :eof
+)
+if defined SHOW_WINDOWS (
+    start "VnSearch %~1 :%~2" cmd /k java -jar "services\%~1\target\%~1-0.0.1-SNAPSHOT.jar"
+    echo   %~1 :%~2 - cửa sổ console riêng
+    goto :eof
+)
+powershell -NoProfile -Command "Start-Process -FilePath java -ArgumentList @('-jar', 'services\%~1\target\%~1-0.0.1-SNAPSHOT.jar') -WindowStyle Hidden -RedirectStandardOutput 'logs\%~1.log' -RedirectStandardError 'logs\%~1.err.log'"
+echo   %~1 :%~2 - chạy ngầm, log: backend\logs\%~1.log
+goto :eof
+
 :usage
 echo.
-echo   run-backend.bat              FULL - backend + postgres + kafka + monitoring
-echo   run-backend.bat --kafka      backend + postgres + cum Kafka
-echo   run-backend.bat --core       backend + postgres
-echo   run-backend.bat --no-build   dung anh da co, khong build lai
-echo   run-backend.bat --logs       bam theo log backend sau khi len
+echo   run-backend.bat            jar, cả 9 service Java + mở luôn giao diện
+echo   run-backend.bat --core     chỉ api-gateway + auth-service + search-service
+echo                              ^(tab Bóng đá sẽ trống vì thiếu football-service^)
+echo   run-backend.bat --no-frontend
+echo                              chỉ chạy backend, không mở giao diện
+echo   run-backend.bat --build    dựng lại jar trước khi chạy
+echo   run-backend.bat --windows  mở một cửa sổ console cho mỗi service thay vì
+echo                              chạy ngầm ^(9 cửa sổ^)
+echo   run-backend.bat --docker   chạy bằng docker compose - LUÔN bật toàn bộ hệ
+echo                              thống kèm Prometheus/Grafana/Alertmanager, nên
+echo                              --core/--full không đổi được gì ở đường này
 echo.
-echo   Tat va giai phong RAM: end-backend.bat
+echo   Chế độ jar chạy các service NGẦM, log đổ vào backend\logs\^<ten^>.log.
+echo   PostgreSQL, Redis và MongoDB tự bật bằng Docker khi cổng còn trống,
+echo   kể cả việc mở Docker Desktop hộ. Giao diện cũng tự mở ở cửa sổ riêng.
 echo.
-echo   Bien moi truong:
-echo     ADMIN_API_KEY   khoa cho /api/admin/**. Khong dat thi lay tu .env,
-echo                     khong co nua thi tu sinh va ghi vao .env.
+echo   Tắt hết: end-backend.bat
+echo.
+echo   Biến môi trường:
+echo     ADMIN_API_KEY             khoá cho /api/admin/**, tối thiểu 16 ký tự.
+echo                               Không đặt thì lấy từ .env, không có nữa thì tự sinh.
+echo     BOOTSTRAP_ADMIN_PASSWORD  mật khẩu tài khoản quản trị đầu tiên của
+echo                               auth-service. Thiếu thì tự sinh và ghi vào .env.
+echo.
+echo   Bảng cổng:
+echo     8080 api-gateway    8081 auth-service      8082 search-service
+echo     8083 crawler        8084 analytics         8085 history
+echo     8086 downloads      8087 settings          8090 football
+echo.
+echo   Chỉ khi chạy bằng --docker:
+echo     3000 Grafana        9090 Prometheus        9093 Alertmanager
 echo.
 call :restore_cp
 endlocal
 exit /b 0
 
 :usage_fail
-echo   Chay "run-backend.bat --help" de xem cac tham so hop le.
+echo   Chạy "run-backend.bat --help" để xem các tham số hợp lệ.
 echo.
-echo Nhan phim bat ky de dong...
+echo Nhấn phím bất kỳ để đóng...
 pause >nul
+call :restore_cp
 endlocal
 exit /b 1
 
 :fail
 echo.
-echo Nhan phim bat ky de dong...
+echo Nhấn phím bất kỳ để đóng...
 pause >nul
 call :restore_cp
 endlocal

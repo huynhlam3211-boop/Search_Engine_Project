@@ -1,16 +1,15 @@
 @echo off
 setlocal
 
-rem Bat UTF-8 cho console de chu tieng Viet cua script PowerShell hien dung.
 for /f "tokens=2 delims=:" %%c in ('chcp') do set "OLD_CP=%%c"
 set "OLD_CP=%OLD_CP: =%"
 chcp 65001 >nul
 
 set "PS1=%~dp0crawl-stats.ps1"
 if not exist "%PS1%" (
-    echo [LOI] Khong thay "%PS1%".
-    echo       Hai file crawl-stats.bat va crawl-stats.ps1 phai nam canh nhau
-    echo       o thu muc goc cua repo.
+    echo [LỖI] Không thấy "%PS1%".
+    echo       Hai tệp crawl-stats.bat và crawl-stats.ps1 phải nằm cạnh nhau
+    echo       ở thư mục gốc của kho.
     goto :fail
 )
 
@@ -31,7 +30,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %ARGS%
 if errorlevel 1 goto :fail
 
 if defined NOPAUSE goto :done
-echo Nhan phim bat ky de dong...
+echo Nhấn phím bất kỳ để đóng...
 pause >nul
 :done
 call :restore_cp
@@ -41,7 +40,7 @@ exit /b 0
 :fail
 echo.
 if not defined NOPAUSE (
-    echo Nhan phim bat ky de dong...
+    echo Nhấn phím bất kỳ để đóng...
     pause >nul
 )
 call :restore_cp

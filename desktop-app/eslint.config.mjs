@@ -25,8 +25,7 @@ export default defineConfig(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules,
-      'no-empty': ['error', { allowEmptyCatch: true }]
+      ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
   eslintConfigPrettier

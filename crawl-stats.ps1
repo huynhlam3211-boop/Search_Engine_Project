@@ -1,5 +1,4 @@
 #requires -version 5.1
-
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
@@ -7,15 +6,11 @@ param(
 
     [switch]$NoLinks,
 
-    [switch]$NoImages,
-
-    [switch]$NoTests
+    [switch]$NoImages
 )
 
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
-
-# ---------------------------------------------------------------- tiện ích in
 
 function Format-Size {
     param([double]$Bytes)
@@ -34,6 +29,14 @@ function Format-Age {
     return ('{0:N0} ngày trước' -f $d.TotalDays)
 }
 
+function Format-Span {
+    param([timespan]$Span)
+    if ($Span.TotalMinutes -lt 1) { return ('{0:N0} giây' -f $Span.TotalSeconds) }
+    if ($Span.TotalHours   -lt 1) { return ('{0:N0} phút' -f $Span.TotalMinutes) }
+    if ($Span.TotalDays    -lt 1) { return ('{0:N1} giờ'  -f $Span.TotalHours) }
+    return ('{0:N1} ngày' -f $Span.TotalDays)
+}
+
 function Write-Field {
     param([string]$Label, [string]$Value)
     Write-Host ('  {0,-24}: ' -f $Label) -NoNewline -ForegroundColor Gray
@@ -50,8 +53,6 @@ function Format-Url {
     if ($Url.Length -le $Max) { return $Url }
     return $Url.Substring(0, $Max - 3) + '...'
 }
-
-# ------------------------------------------------------------------ quét tệp
 
 function Measure-Corpus {
     param([System.IO.FileInfo]$File, [bool]$CountLinks)
@@ -77,7 +78,6 @@ function Measure-Corpus {
             $t = $line.Trim()
 
             if ($null -ne $pending) {
-                # Đang gom một mảng outlinks nhiều dòng.
                 $close = $t.IndexOf(']')
                 if ($close -ge 0) {
                     $pending += $t.Substring(0, $close)
@@ -133,9 +133,6 @@ function Measure-Corpus {
         $reader.Dispose()
     }
 
-    # Liên kết đã biết nhưng chưa tải về = phần hàng đợi còn lại cho phiên sau.
-    # Đếm số liên kết khác nhau TRƯỚC khi trừ đi phần đã crawl, vì ExceptWith
-    # sửa thẳng tập hợp chứ không trả về tập mới.
     $unique    = -1
     $remaining = -1
     $remKnown  = -1
@@ -145,10 +142,6 @@ function Measure-Corpus {
         $links.ExceptWith($crawled)
         $remaining = $links.Count
 
-        # Hàng đợi còn lại nằm trong tên miền đã crawl hay trỏ ra ngoài? Con số
-        # này quyết định chạy tiếp sẽ đào sâu (cùng tên miền, tốt cho corpus có
-        # trọng tâm) hay lan ra (tên miền mới, cần thêm robots.txt + hàng đợi
-        # lịch sự riêng cho mỗi host).
         $remKnown = 0
         $newHosts = @{}
         foreach ($l in $links) {
@@ -164,8 +157,6 @@ function Measure-Corpus {
         }
     }
 
-    # Trung vị + phân vị 90: sắp xếp bản sao mảng, rẻ hơn hẳn Sort-Object vì
-    # làm trên int thuần chứ không bọc mỗi phần tử vào PSObject.
     $median = 0
     $p90    = 0
     if ($perPage.Count -gt 0) {
@@ -197,16 +188,10 @@ function Add-Links {
     param([string]$Inner, $Set, [bool]$Count)
 
     $Inner = $Inner.Trim().TrimEnd(',').Trim()
-    if ($Inner.Length -lt 2) { return 0 }   # mảng rỗng: "[ ]"
+    if ($Inner.Length -lt 2) { return 0 }
 
-    # Đường nhanh: tách theo dấu phân cách giữa hai phần tử. Mẫu phải nhận cả
-    # '", "' (Jackson viết mảng gọn trên một dòng) lẫn '","' (mảng xuống dòng,
-    # như seed-documents.json — các dòng được nối lại nên mất luôn khoảng
-    # trắng). Chuỗi này không thể xuất hiện giữa lòng một URL, vì dấu nháy bên
-    # trong chuỗi JSON luôn bị escape thành \"; gặp escape thật thì rơi xuống
-    # nhánh regex bên dưới cho chắc.
     if ($Inner.IndexOf('\"') -lt 0) {
-        $body = $Inner.Substring(1, $Inner.Length - 2)   # bỏ nháy đầu và cuối
+        $body = $Inner.Substring(1, $Inner.Length - 2)
         $parts = $body -split '",\s*"'
         if ($Count) { foreach ($p in $parts) { [void]$Set.Add($p) } }
         return $parts.Count
@@ -220,16 +205,6 @@ function Add-Links {
     return $n
 }
 
-# ------------------------------------------------------------------ quét ảnh
-
-<#
-    Tệp ảnh đi kèm một tệp corpus.
-
-        data/crawled-documents.json  ->  data/crawled-documents.images.json
-
-    Quy ước này do ImageStorage.pathFor phía Java đặt ra; hàm dưới đây chỉ lặp
-    lại nó. Hai chỗ phải khớp nhau, nên nếu đổi thì đổi cả hai.
-#>
 function Get-ImagePath {
     param([string]$CorpusPath)
     if ($CorpusPath.EndsWith('.json')) {
@@ -238,26 +213,6 @@ function Get-ImagePath {
     return $CorpusPath + '.images.json'
 }
 
-<#
-    Quét tệp ảnh, đọc TỪNG DÒNG — cùng cách và cùng lý do như Measure-Corpus.
-
-    Bản ghi ImageFound do Jackson ghi ra với INDENT_OUTPUT nên mỗi trường nằm
-    trên một dòng riêng:
-
-        {
-          "pageUrl" : "https://vnexpress.net/...",
-          "host" : "vnexpress.net",
-          "imageUrl" : "https://i1-kinhdoanh.vnecdn.net/....jpg",
-          "altText" : "Nhà đầu tư theo dõi bảng điện tử",
-          "declaredWidth" : 680,
-          "declaredHeight" : 408,
-          "sizeBytes" : -1,
-          "contentHash" : null
-        }
-
-    Đếm theo "imageUrl" chứ không theo dấu ngoặc nhọn: dấu ngoặc còn thuộc về
-    cấu trúc bao ngoài, còn imageUrl thì đúng một dòng cho mỗi ảnh.
-#>
 function Measure-Images {
     param([System.IO.FileInfo]$File)
 
@@ -271,9 +226,6 @@ function Measure-Images {
     $hosts     = @{}
     $extensions = @{}
 
-    # Số ảnh của TỪNG trang, để tính trung vị và trang nhiều ảnh nhất. Lý do
-    # giống hệt phần outlinks: vài trang thư viện ảnh với hàng chục ảnh kéo
-    # trung bình cộng lên cao hơn hẳn trang bài viết bình thường.
     $perPage   = @{}
     $curPage   = ''
 
@@ -310,9 +262,6 @@ function Measure-Images {
                     $u = $m.Groups[1].Value
                     [void]$urls.Add($u)
 
-                    # Đuôi tệp: cho biết corpus ảnh nghiêng về ảnh nội dung
-                    # (jpg/png) hay ảnh giao diện (svg/gif). Cắt tham số truy
-                    # vấn trước, vì CDN hay gắn "?w=680&q=100" vào sau đuôi.
                     $clean = $u.Split('?')[0].Split('#')[0]
                     $dot = $clean.LastIndexOf('.')
                     $slash = $clean.LastIndexOf('/')
@@ -325,9 +274,6 @@ function Measure-Images {
             }
 
             if ($t.StartsWith('"altText"')) {
-                # Chuỗi RỖNG nghĩa là thiếu alt — đúng định nghĩa của
-                # ImageFound.missingAlt(). Chuỗi chỉ có khoảng trắng cũng tính
-                # là thiếu, vì phía Java dùng isBlank() chứ không isEmpty().
                 $m = [regex]::Match($t, '^"altText"\s*:\s*"(.*)"\s*,?$')
                 if ($m.Success -and -not [string]::IsNullOrWhiteSpace($m.Groups[1].Value)) {
                     $withAlt++
@@ -354,20 +300,12 @@ function Measure-Images {
         $reader.Dispose()
     }
 
-    # Đếm số trang CHẠM TRẦN. Hai trần khác nhau cắt ở hai chỗ khác nhau:
-    #
-    #   50 = app.crawler.images.max-per-page  (cấu hình, ImageDownloadService)
-    #   60 = ImageStore.MAX_IMAGES_PER_PAGE   (bất biến của kho, không đổi được)
-    #
-    # Trần cấu hình THẤP HƠN nên nó luôn cắt trước — nghĩa là trần 60 trên thực
-    # tế không bao giờ chạm tới ở cấu hình mặc định. Chỉ kiểm tra mốc 60 thì
-    # cảnh báo không bao giờ bắn, kể cả khi ảnh đang bị cắt thật.
     $atConfigCap = 0
-    $atStoreCap  = 0
     foreach ($n in $perPage.Values) {
-        if ($n -ge 60) { $atStoreCap++ }
-        elseif ($n -ge 50) { $atConfigCap++ }
+        if ($n -ge 50) { $atConfigCap++ }
     }
+    $overStore = $pages.Count - 50000
+    if ($overStore -lt 0) { $overStore = 0 }
 
     $counts = @($perPage.Values)
     $median = 0
@@ -398,7 +336,7 @@ function Measure-Images {
         MaxImages  = $maxImg
         MaxUrl     = $maxUrl
         AtConfigCap = $atConfigCap
-        AtStoreCap  = $atStoreCap
+        OverStore   = $overStore
     }
 }
 
@@ -416,10 +354,6 @@ function Show-ImageReport {
 
     Write-Sub 'tệp ảnh' ('{0}  ({1})' -f $f.Name, (Format-Size $f.Length))
 
-    # Tỉ lệ có alt là THƯỚC ĐO CHẤT LƯỢNG của corpus ảnh, không phải số liệu
-    # trang trí. ImageSearchController sắp ảnh có alt lên trước ảnh thiếu alt,
-    # vì alt phân biệt ảnh NỘI DUNG với ảnh TRANG TRÍ (icon, logo). Tỉ lệ này
-    # thấp nghĩa là lưới ảnh sẽ đầy icon.
     Write-Sub 'có văn bản thay thế' ('{0:N0}  ({1:P1})' -f $Stat.WithAlt, ($Stat.WithAlt / $Stat.Images))
     $missRatio = $Stat.MissingAlt / $Stat.Images
     $missNote = if ($missRatio -gt 0.5) {
@@ -431,9 +365,6 @@ function Show-ImageReport {
         Write-Sub 'địa chỉ ảnh khác nhau' ('{0:N0}  (cùng một ảnh xuất hiện trên nhiều trang)' -f $Stat.UniqueUrls)
     }
 
-    # Kích thước khai báo trong HTML. Con số này quyết định lưới ảnh ở giao diện
-    # có xếp đúng chỗ ngay từ đầu hay phải chờ ảnh tải xong mới đo được — xem
-    # FALLBACK_RATIO trong ImageResultGrid.tsx.
     Write-Sub 'có khai báo kích thước' ('{0:N0}  ({1:P1})  — phần còn lại lưới phải tự đo lúc hiển thị' -f `
         $Stat.Declared, ($Stat.Declared / $Stat.Images))
 
@@ -443,20 +374,10 @@ function Show-ImageReport {
         Write-Sub 'đã tải nội dung' '0  — app.crawler.images.download=false (mặc định, chỉ lưu siêu dữ liệu)'
     }
 
-    # --- phân bố theo trang ---
     Write-Host ''
     Write-Field 'Số trang có ảnh' ('{0:N0}' -f $Stat.Pages)
     if ($CorpusPages -gt 0) {
         if ($Stat.Pages -gt $CorpusPages) {
-            # Kho ảnh nhắc tới NHIỀU trang hơn số trang có trong corpus. Không
-            # phải lỗi làm tròn — nó nghĩa là hai tệp thuộc hai phiên crawl khác
-            # nhau, thường do corpus bị ghi đè bằng --fresh mà tệp ảnh thì
-            # không, hoặc do chép tay một trong hai tệp từ nơi khác về.
-            #
-            # Hệ quả thật: ImageSearchController tra ảnh THEO URL trang lấy từ
-            # kết quả tìm kiếm, nên ảnh của những trang không nằm trong corpus
-            # sẽ không bao giờ được trả về. Chúng chiếm chỗ trên đĩa mà không
-            # bao giờ hiện ra.
             $orphan = $Stat.Pages - $CorpusPages
             Write-Sub 'trên tổng số trang' ('{0:N0}' -f $CorpusPages)
             Write-Host ('       [CHÚ Ý] Kho ảnh nhắc tới {0:N0} trang KHÔNG có trong corpus.' -f $orphan) -ForegroundColor DarkYellow
@@ -474,13 +395,6 @@ function Show-ImageReport {
         Write-Sub 'trang nhiều ảnh nhất' (Format-Url $Stat.MaxUrl 60)
     }
 
-    # Chạm trần nghĩa là có trang bị cắt bớt ảnh — mọi con số ở trên khi đó là
-    # CHẶN DƯỚI, không phải con số thật. Nói rõ trần nào đang cắt, vì hai trần
-    # sửa ở hai chỗ hoàn toàn khác nhau.
-    if ($Stat.AtStoreCap -gt 0) {
-        Write-Host ('       [CHÚ Ý] {0:N0} trang chạm trần ImageStore.MAX_IMAGES_PER_PAGE = 60.' -f $Stat.AtStoreCap) -ForegroundColor DarkYellow
-        Write-Host '               Đây là bất biến của kho, phải sửa mã nguồn mới đổi được.' -ForegroundColor DarkGray
-    }
     if ($Stat.AtConfigCap -gt 0) {
         Write-Host ('       [CHÚ Ý] {0:N0} trang ({1:P1}) chạm trần app.crawler.images.max-per-page = 50.' -f `
             $Stat.AtConfigCap, ($Stat.AtConfigCap / $Stat.Pages)) -ForegroundColor DarkYellow
@@ -488,7 +402,13 @@ function Show-ImageReport {
         Write-Host '               Nâng trong application.properties nếu muốn giữ nhiều ảnh hơn mỗi trang.' -ForegroundColor DarkGray
     }
 
-    # --- tên miền ---
+    if ($Stat.OverStore -gt 0) {
+        Write-Host ('       [CHÚ Ý] Kho ảnh có {0:N0} trang, vượt ImageStore.MAX_PAGES = 50.000 tới {1:N0} trang.' -f `
+            $Stat.Pages, $Stat.OverStore) -ForegroundColor DarkYellow
+        Write-Host '               Tệp trên đĩa vẫn đủ, nhưng lúc nạp ImageStore chỉ nhận 50.000 trang đầu;' -ForegroundColor DarkGray
+        Write-Host '               ảnh của phần còn lại không bao giờ ra tới tab Hình ảnh.' -ForegroundColor DarkGray
+    }
+
     Write-Host ''
     Write-Field 'Số tên miền có ảnh' ('{0:N0}' -f $Stat.Hosts.Count)
     $topHosts = $Stat.Hosts.GetEnumerator() | Sort-Object -Property Value -Descending
@@ -499,12 +419,82 @@ function Show-ImageReport {
         Write-Host ('       ... còn {0} tên miền nữa' -f ($Stat.Hosts.Count - 10)) -ForegroundColor DarkGray
     }
 
-    # --- định dạng ---
     Write-Host ''
     Write-Field 'Định dạng ảnh' ('{0:N0} loại đuôi tệp' -f $Stat.Extensions.Count)
     $topExt = $Stat.Extensions.GetEnumerator() | Sort-Object -Property Value -Descending
     foreach ($e in ($topExt | Select-Object -First 8)) {
         Write-Host ('       {0,-34} {1,8:N0}  {2,6:P1}' -f $e.Key, $e.Value, ($e.Value / $Stat.Images)) -ForegroundColor DarkGray
+    }
+}
+
+function Get-CorpusKind {
+    param([System.IO.FileInfo]$File)
+    $n = $File.Name.ToLower()
+    if ($n.EndsWith('.images.json')) { return 'images' }
+    if ($n -eq 'index.json')         { return 'index' }
+    if ($n -eq 'users.json')         { return 'users' }
+    return 'corpus'
+}
+
+function Show-IndexReport {
+    param([System.IO.FileInfo]$File, $CorpusStats)
+
+    Write-Host ''
+    Write-Host ('  ' + $File.Name + '   (chỉ mục đã dựng sẵn, không phải corpus)') -ForegroundColor Cyan
+    Write-Host ('  ' + ('-' * [Math]::Max(20, $File.Name.Length + 38)))
+
+    Write-Field 'Dung lượng' ('{0}  ({1:N0} byte)' -f (Format-Size $File.Length), $File.Length)
+    Write-Field 'Cập nhật lúc' ('{0:yyyy-MM-dd HH:mm:ss}  ({1})' -f $File.LastWriteTime, (Format-Age $File.LastWriteTime))
+
+    $head = ''
+    try {
+        $reader = New-Object System.IO.StreamReader($File.FullName, [System.Text.Encoding]::UTF8)
+        try {
+            $buf = New-Object char[] 4096
+            $n = $reader.Read($buf, 0, $buf.Length)
+            if ($n -gt 0) { $head = -join $buf[0..($n - 1)] }
+        } finally {
+            $reader.Dispose()
+        }
+    } catch {
+        Write-Host '  (không đọc được phần đầu tệp)' -ForegroundColor DarkYellow
+        return
+    }
+
+    $mv = [regex]::Match($head, '"version"\s*:\s*(\d+)')
+    if ($mv.Success) {
+        $v = [int]$mv.Groups[1].Value
+        if ($v -eq 3) {
+            Write-Field 'Phiên bản định dạng' ('{0}  (khớp InvertedIndex.FORMAT_VERSION)' -f $v)
+        } else {
+            Write-Field 'Phiên bản định dạng' ('{0}  <- KHÔNG khớp FORMAT_VERSION = 3' -f $v)
+            Write-Host '       Backend sẽ bỏ tệp này và dựng lại chỉ mục từ corpus lúc khởi động.' -ForegroundColor DarkGray
+        }
+    }
+
+    $mt = [regex]::Match($head, '"tokenizer"\s*:\s*"(.*?)"')
+    if ($mt.Success) {
+        Write-Field 'Bộ tách từ' (Format-Url $mt.Groups[1].Value 72)
+    }
+
+    $newest = $null
+    foreach ($c in $CorpusStats) {
+        if ($c.Pages -le 0) { continue }
+        if ($null -eq $newest -or $c.File.LastWriteTime -gt $newest.LastWriteTime) { $newest = $c.File }
+    }
+    if ($null -eq $newest) { return }
+
+    $lag = $newest.LastWriteTime - $File.LastWriteTime
+
+    if ($lag.TotalMinutes -gt 1) {
+        Write-Host ''
+        Write-Host ('  [CHÚ Ý] Chỉ mục CŨ HƠN "{0}" tới {1}.' -f $newest.Name, (Format-Span $lag)) -ForegroundColor DarkYellow
+        Write-Host '          SearchEngineFacade ưu tiên index.json nên backend sẽ nạp bản cũ này:' -ForegroundColor DarkGray
+        Write-Host '          không một dòng lỗi nào, chỉ là các trang crawl gần đây không tìm được.' -ForegroundColor DarkGray
+        Write-Host '          Lập lại chỉ mục một lần (backend phải đang chạy):' -ForegroundColor DarkGray
+        Write-Host '              curl -X POST -H "X-API-Key: <khoa trong .env>" http://localhost:8083/api/admin/reindex' -ForegroundColor DarkGray
+    } else {
+        Write-Field 'So với corpus' ('khớp với "{0}" — chỉ mục không cũ hơn corpus' -f $newest.Name)
     }
 }
 
@@ -517,116 +507,6 @@ function Get-Host2 {
     if ($j -ge 0) { $rest = $rest.Substring(0, $j) }
     return $rest
 }
-
-# ------------------------------------------------------------------ quét test
-
-# Đọc kết quả từ báo cáo Surefire đã có sẵn trên đĩa, KHÔNG chạy lại `mvn test`.
-# Chạy lại mất gần một phút và sẽ biến một lệnh xem thống kê thành một lệnh
-# build — cái giá đó không đáng cho một mục phụ. Đổi lại, con số có thể đã cũ,
-# nên phải tự kiểm tra và nói ra (xem Show-TestReport).
-function Measure-Tests {
-    param([string]$ReportDir)
-
-    if (-not (Test-Path -LiteralPath $ReportDir)) { return $null }
-    $files = @(Get-ChildItem -LiteralPath $ReportDir -Filter 'TEST-*.xml' -File -ErrorAction SilentlyContinue)
-    if ($files.Count -eq 0) { return $null }
-
-    $total = 0; $failures = 0; $errors = 0; $skipped = 0
-    $failed = @()
-    $newest = [datetime]::MinValue
-
-    foreach ($f in $files) {
-        if ($f.LastWriteTime -gt $newest) { $newest = $f.LastWriteTime }
-        try { [xml]$doc = Get-Content -LiteralPath $f.FullName -Raw } catch { continue }
-        $suite = $doc.testsuite
-        if (-not $suite) { continue }
-
-        # Đếm phần tử <testcase>, KHÔNG dùng thuộc tính tests= của <testsuite>.
-        # Với lớp có @Nested, Surefire ghi tests= thiếu (CrawlEventTest: tests=23
-        # nhưng có 24 <testcase>), nên cộng thuộc tính đó cho ra tổng lệch với
-        # con số Maven in ra ở cuối `mvn test`. Đếm phần tử thì khớp.
-        foreach ($case in @($suite.testcase)) {
-            if ($null -eq $case) { continue }
-            $total++
-            if ($case.failure) {
-                $failures++
-            } elseif ($case.error) {
-                $errors++
-            } elseif ($case.skipped) {
-                $skipped++
-            }
-            if ($case.failure -or $case.error) {
-                $failed += [pscustomobject]@{
-                    Class = $suite.name
-                    Name  = $case.name
-                }
-            }
-        }
-    }
-
-    return [pscustomobject]@{
-        Classes  = $files.Count
-        Total    = $total
-        Failures = $failures
-        Errors   = $errors
-        Skipped  = $skipped
-        Passed   = $total - $failures - $errors - $skipped
-        Failed   = $failed
-        RunAt    = $newest
-    }
-}
-
-function Show-TestReport {
-    param($Stat, [string]$SourceRoot)
-
-    Write-Host ''
-    Write-Host '  BỘ TEST' -ForegroundColor Green
-    Write-Host '  -------'
-
-    if ($null -eq $Stat -or $Stat.Total -eq 0) {
-        Write-Host '  Chưa có báo cáo test nào.' -ForegroundColor DarkYellow
-        Write-Host '  Chạy một lần: search-engine\mvnw.cmd test' -ForegroundColor DarkGray
-        return
-    }
-
-    $allGreen = ($Stat.Failures -eq 0 -and $Stat.Errors -eq 0)
-    if ($allGreen) { $color = 'Green' } else { $color = 'Red' }
-
-    Write-Host ('  {0,-24}: ' -f 'Test xanh') -NoNewline -ForegroundColor Gray
-    Write-Host ('{0}/{1}' -f $Stat.Passed, $Stat.Total) -NoNewline -ForegroundColor $color
-    if ($allGreen) {
-        Write-Host '  (tất cả đều qua)' -ForegroundColor DarkGray
-    } else {
-        Write-Host ('  ({0:P1})' -f ($Stat.Passed / $Stat.Total)) -ForegroundColor DarkGray
-    }
-
-    Write-Field 'Lớp test' ('{0:N0}' -f $Stat.Classes)
-    if ($Stat.Failures -gt 0) { Write-Sub 'thất bại (assert sai)' ('{0:N0}' -f $Stat.Failures) }
-    if ($Stat.Errors   -gt 0) { Write-Sub 'lỗi (ném ngoại lệ)'    ('{0:N0}' -f $Stat.Errors) }
-    if ($Stat.Skipped  -gt 0) { Write-Sub 'bỏ qua'                ('{0:N0}' -f $Stat.Skipped) }
-    Write-Field 'Chạy lúc' ('{0:yyyy-MM-dd HH:mm:ss}  ({1})' -f $Stat.RunAt, (Format-Age $Stat.RunAt))
-
-    foreach ($f in $Stat.Failed) {
-        $shortClass = $f.Class -replace '^com\.vnsearch\.', ''
-        Write-Host ('       {0}.{1}' -f $shortClass, $f.Name) -ForegroundColor Red
-    }
-
-    # Con số đọc từ đĩa chỉ đúng với bản mã tại thời điểm chạy test. Có tệp
-    # nguồn mới hơn báo cáo nghĩa là nó đã lỗi thời — im lặng ở đây thì người
-    # đọc tin vào một kết quả không còn phản ánh mã hiện tại.
-    if ($SourceRoot -and (Test-Path -LiteralPath $SourceRoot)) {
-        $newerSource = @(Get-ChildItem -LiteralPath $SourceRoot -Filter '*.java' -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.LastWriteTime -gt $Stat.RunAt })
-        if ($newerSource.Count -gt 0) {
-            Write-Host ''
-            Write-Host ('  [CHÚ Ý] {0} tệp .java đã sửa SAU lần chạy test này.' -f $newerSource.Count) -ForegroundColor DarkYellow
-            Write-Host '          Con số ở trên không còn phản ánh mã hiện tại.' -ForegroundColor DarkGray
-            Write-Host '          Chạy lại: search-engine\mvnw.cmd test' -ForegroundColor DarkGray
-        }
-    }
-}
-
-# ------------------------------------------------------------------ báo cáo
 
 function Show-Report {
     param($Stat, [bool]$CountLinks)
@@ -650,7 +530,6 @@ function Show-Report {
         Write-Field 'Trang không có nội dung' ('{0:N0}  ({1:P1} tổng số)' -f $Stat.EmptyBody, ($Stat.EmptyBody / $Stat.Pages))
     }
 
-    # Tên miền: cho thấy corpus có bị lệch hẳn về một trang báo hay không.
     $top = $Stat.Domains.GetEnumerator() | Sort-Object -Property Value -Descending
     Write-Field 'Số tên miền' ('{0:N0}' -f $Stat.Domains.Count)
     foreach ($d in ($top | Select-Object -First 12)) {
@@ -660,7 +539,6 @@ function Show-Report {
         Write-Host ('       ... còn {0} tên miền nữa' -f ($Stat.Domains.Count - 12)) -ForegroundColor DarkGray
     }
 
-    # --- liên kết ---
     Write-Host ''
     Write-Field 'Liên kết thu được' ('{0:N0}  (tổng số outlinks, tính cả trùng lặp)' -f $Stat.OutTotal)
     Write-Sub 'mỗi trang' ('{0:N1} trung bình | {1:N0} trung vị | {2:N0} phân vị 90 | {3:N0} nhiều nhất' -f `
@@ -674,23 +552,14 @@ function Show-Report {
     }
 
     if ($CountLinks) {
-        # Tỉ lệ trùng cho biết UrlSeenFilter gánh bao nhiêu: mỗi outlink là một
-        # lần tra bộ lọc, nhưng chỉ phần "khác nhau" mới thành một lần ghi.
         $dup = if ($Stat.OutTotal -gt 0) { 1 - ($Stat.OutUnique / $Stat.OutTotal) } else { 0 }
         $rep = if ($Stat.OutUnique -gt 0) { $Stat.OutTotal / $Stat.OutUnique } else { 0 }
         Write-Field 'Liên kết khác nhau' ('{0:N0}  (trùng lặp {1:P1} — mỗi URL gặp lại ~{2:N1} lần)' -f `
             $Stat.OutUnique, $dup, $rep)
         Write-Sub 'mỗi trang' ('{0:N1} URL khác nhau' -f ($Stat.OutUnique / $Stat.Pages))
 
-        # Đây là link THÔ: outlinks lưu trong corpus là toàn bộ liên kết bóc
-        # được từ HTML, UrlFilter chỉ chạy lúc nạp vào frontier (xem
-        # CrawlerService.enqueue). Nên con số này là chặn TRÊN của hàng đợi
-        # thật — phần trỏ sang tên miền ngoài allowedDomains sẽ bị loại sạch.
         Write-Field 'Chưa crawl' ('{0:N0}  <- chặn trên của hàng đợi (link thô, chưa qua UrlFilter)' -f $Stat.Remaining)
 
-        # Hệ số nhân của frontier: crawl xong 1 trang thì hàng đợi phình thêm
-        # bao nhiêu URL. Lớn hơn 1 nghĩa là hàng đợi không bao giờ cạn, dừng
-        # lúc nào là do người chạy quyết chứ không phải do hết URL.
         $growth = $Stat.Remaining / $Stat.Pages
         $note = if ($growth -gt 1) { 'hệ số nhân > 1: hàng đợi không cạn' } else { 'hệ số nhân < 1: hàng đợi đang co lại' }
         Write-Sub 'mỗi trang' ('{0:N1} URL mới  ({1})' -f $growth, $note)
@@ -707,9 +576,6 @@ function Show-Report {
             }
         }
 
-        # Ước tính dung lượng: nhân số byte trung bình mỗi trang. Con số này
-        # thiên về hơi cao, vì trang càng nhiều thì tỉ lệ trang trùng mẫu
-        # (menu, chân trang) càng lớn và nén/lọc về sau càng hiệu quả.
         $perPage = $f.Length / $Stat.Pages
         Write-Host ''
         Write-Host '  Ước tính dung lượng (theo mức trung bình hiện tại):' -ForegroundColor Gray
@@ -721,18 +587,13 @@ function Show-Report {
     }
 }
 
-# --------------------------------------------------------------------- chạy
-
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $Path) { $Path = Join-Path $root 'search-engine\data' }
+if (-not $Path) { $Path = Join-Path $root 'backend\data' }
 
-# Đường dẫn tương đối được thử theo ba mốc, chứ không chỉ theo thư mục hiện
-# hành: người dùng gõ quen tay đúng chuỗi đã dùng với run-crawl.bat
-# ("data/crawled-documents.json"), mà chuỗi đó tính từ thư mục search-engine.
 $candidates = @($Path)
 if (-not [System.IO.Path]::IsPathRooted($Path)) {
     $candidates += (Join-Path $root $Path)
-    $candidates += (Join-Path (Join-Path $root 'search-engine') $Path)
+    $candidates += (Join-Path (Join-Path $root 'backend') $Path)
 }
 $resolved = $null
 foreach ($c in $candidates) {
@@ -747,23 +608,35 @@ if (-not $resolved) {
 $Path = $resolved
 
 $item = Get-Item -LiteralPath $Path
+
+$indexFile = $null
+$skipped   = @()
 if ($item.PSIsContainer) {
-    # LOẠI tệp ảnh khỏi danh sách corpus. Chúng nằm cùng thư mục và cũng có
-    # đuôi .json, nên nếu không lọc thì mỗi tệp ảnh bị quét như một corpus rồi
-    # báo "không nhận ra định dạng" — một dòng cảnh báo sai cho một tệp hoàn
-    # toàn bình thường. Chúng được báo cáo ở đúng chỗ: kèm theo corpus của mình.
-    $files = @(Get-ChildItem -LiteralPath $item.FullName -Filter '*.json' -File |
-        Where-Object { $_.Name -notlike '*.images.json' } |
-        Sort-Object Length -Descending)
+    $all = @(Get-ChildItem -LiteralPath $item.FullName -Filter '*.json' -File | Sort-Object Length -Descending)
+    $files = @()
+    foreach ($f in $all) {
+        switch (Get-CorpusKind $f) {
+            'corpus' { $files += $f }
+            'index'  { $indexFile = $f }
+            'images' { }
+            default  { $skipped += $f }
+        }
+    }
     $scope = $item.FullName
 } else {
-    $files = @($item)
+    if ((Get-CorpusKind $item) -eq 'index') {
+        $files = @()
+        $indexFile = $item
+    } else {
+        $files = @($item)
+    }
     $scope = $item.DirectoryName
 }
 
-if ($files.Count -eq 0) {
+if ($files.Count -eq 0 -and $null -eq $indexFile) {
     Write-Host ''
-    Write-Host ('[LỖI] Không có tệp .json nào trong "{0}".' -f $item.FullName) -ForegroundColor Red
+    Write-Host ('[LỖI] Không có tệp corpus nào trong "{0}".' -f $item.FullName) -ForegroundColor Red
+    Write-Host '       Chưa crawl lần nào thì chạy run-crawl.bat trước.'
     exit 1
 }
 
@@ -784,14 +657,6 @@ foreach ($f in $files) {
 
     $imageSeconds = 0.0
 
-    # Ảnh: báo cáo NGAY DƯỚI corpus tương ứng, không gom thành một mục riêng ở
-    # cuối. Mọi tỉ lệ đáng đọc đều là tỉ lệ giữa hai bên ("bao nhiêu phần trăm
-    # trang có ảnh"), nên đặt xa nhau là bắt người đọc tự ghép số.
-    # `$s.Pages -gt 0`: bỏ qua hoàn toàn phần ảnh cho tệp KHÔNG PHẢI corpus.
-    # Thư mục data còn chứa index.json — chỉ mục đã dựng sẵn, không có trường
-    # "url" nào. Không có điều kiện này thì mỗi lần chạy lại in ra một lời
-    # khuyên "hãy chạy run-crawl.bat để sinh index.images.json", tức là mách
-    # người dùng đi tìm một tệp không bao giờ tồn tại và cũng không nên tồn tại.
     if ($countImages -and $s.Pages -gt 0) {
         $imagePath = Get-ImagePath $f.FullName
         if (Test-Path -LiteralPath $imagePath) {
@@ -803,8 +668,6 @@ foreach ($f in $files) {
             $imageStats += $si
             Show-ImageReport -Stat $si -CorpusPages $s.Pages
         } else {
-            # Không có tệp ảnh KHÔNG phải lỗi — nhưng nó có đúng một nguyên nhân
-            # và một cách sửa, nên nói thẳng ra thay vì im lặng bỏ qua.
             Write-Host ''
             Write-Host ('  [CHÚ Ý] Chưa có tệp ảnh "{0}".' -f (Split-Path -Leaf $imagePath)) -ForegroundColor DarkYellow
             Write-Host '          Corpus này được crawl bằng bản mã cũ chưa lưu ảnh ra đĩa.' -ForegroundColor DarkGray
@@ -821,8 +684,11 @@ foreach ($f in $files) {
     }
 }
 
-# Tổng hợp + chỗ trống còn lại của ổ đĩa: câu hỏi "tốn bao nhiêu GB" chỉ có
-# nghĩa khi đặt cạnh dung lượng trống.
+if ($null -ne $indexFile) {
+    Show-IndexReport -File $indexFile -CorpusStats $stats
+    Write-Host ''
+}
+
 $totalBytes = ($files | Measure-Object -Property Length -Sum).Sum
 $totalPages = ($stats | Measure-Object -Property Pages -Sum).Sum
 
@@ -836,9 +702,6 @@ if ($imageStats.Count -gt 0) {
     $totalImages   = ($imageStats | Measure-Object -Property Images -Sum).Sum
     $totalWithAlt  = ($imageStats | Measure-Object -Property WithAlt -Sum).Sum
     $totalImgPages = ($imageStats | Measure-Object -Property Pages -Sum).Sum
-    # Cộng tay chứ không `Measure-Object -Property { ... }`: PowerShell 5.1
-    # KHÔNG nhận khối script làm tên thuộc tính, nó ném
-    # GenericMeasurePropertyNotFound. Cú pháp đó chỉ có từ PowerShell 7.
     $totalImgBytes = 0L
     foreach ($i in $imageStats) { $totalImgBytes += $i.File.Length }
 
@@ -846,9 +709,6 @@ if ($imageStats.Count -gt 0) {
     if ($totalImages -gt 0) {
         Write-Sub 'có văn bản thay thế' ('{0:N0}  ({1:P1})' -f $totalWithAlt, ($totalWithAlt / $totalImages))
 
-        # Cùng lý do như trong Show-ImageReport: khi kho ảnh và corpus lệch
-        # phiên, tỉ lệ vượt 100% và trở thành một con số vô nghĩa. In số tuyệt
-        # đối thay vì một phần trăm không đọc được.
         if ($totalImgPages -gt $totalPages) {
             Write-Sub 'trang có ảnh' ('{0:N0}  <- NHIỀU HƠN tổng số trang corpus, hai bên lệch phiên crawl' -f $totalImgPages)
         } else {
@@ -857,17 +717,21 @@ if ($imageStats.Count -gt 0) {
             Write-Sub 'mỗi trang' ('{0:N1} ảnh trung bình' -f ($totalImages / [Math]::Max(1, $totalPages)))
         }
     }
-    # Cộng tệp ảnh vào tổng dung lượng: chúng là một phần của "corpus tốn bao
-    # nhiêu GB", và bỏ chúng ra khiến ước tính dung lượng phía dưới thiếu hụt.
     $totalBytes += $totalImgBytes
     Write-Sub 'dung lượng tệp ảnh' (Format-Size $totalImgBytes)
 }
 
-# Nhãn "(corpus + ảnh)" chỉ đúng khi THẬT SỰ có tệp ảnh được cộng vào. Dán nó
-# vô điều kiện thì ở một corpus chưa có ảnh, người đọc tưởng ảnh đã được tính
-# và kết luận sai rằng ảnh gần như không tốn dung lượng.
-$sizeLabel = if ($imageStats.Count -gt 0) { '  (corpus + ảnh)' } else { '  (chưa có tệp ảnh nào)' }
+$parts = @('corpus')
+if ($imageStats.Count -gt 0) { $parts += 'ảnh' }
+if ($null -ne $indexFile) {
+    $totalBytes += $indexFile.Length
+    $parts += 'chỉ mục'
+}
+$sizeLabel = if ($parts.Count -gt 1) { '  (' + ($parts -join ' + ') + ')' } else { '  (chưa có tệp ảnh hay chỉ mục nào)' }
 Write-Field 'Tổng dung lượng' ((Format-Size $totalBytes) + $sizeLabel)
+if ($null -ne $indexFile) {
+    Write-Sub 'trong đó chỉ mục' (Format-Size $indexFile.Length)
+}
 
 $drive = Get-PSDrive -Name (Split-Path -Qualifier $item.FullName).TrimEnd(':') -ErrorAction SilentlyContinue
 if ($drive -and $null -ne $drive.Free) {
@@ -879,21 +743,19 @@ if ($drive -and $null -ne $drive.Free) {
     }
 }
 
-# Tệp .tmp còn sót nghĩa là một lần ghi bị cắt ngang giữa chừng (xem
-# ContentStorage.saveToJson: ghi ra .tmp rồi đổi tên). Corpus vẫn nguyên vẹn,
-# nhưng tệp rác này chiếm chỗ và nên xoá.
+if ($skipped.Count -gt 0) {
+    Write-Host ''
+    foreach ($f in $skipped) {
+        Write-Host ('  (bỏ qua "{0}" — không phải corpus, không có gì để thống kê)' -f $f.Name) -ForegroundColor DarkGray
+    }
+}
+
 $tmp = @(Get-ChildItem -LiteralPath $scope -Filter '*.json.tmp' -File -ErrorAction SilentlyContinue)
 if ($tmp.Count -gt 0) {
     Write-Host ''
     foreach ($t in $tmp) {
         Write-Host ('  [CHÚ Ý] Còn tệp tạm "{0}" ({1}) — một lần ghi bị cắt ngang, xoá được.' -f $t.Name, (Format-Size $t.Length)) -ForegroundColor DarkYellow
     }
-}
-
-if (-not $NoTests) {
-    $engineRoot = Join-Path $root 'search-engine'
-    Show-TestReport -Stat (Measure-Tests (Join-Path $engineRoot 'target\surefire-reports')) `
-                    -SourceRoot (Join-Path $engineRoot 'src')
 }
 
 Write-Host ''
