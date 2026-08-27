@@ -273,6 +273,10 @@ public class MultiDomainCrawlRunner {
         }
         return host;
     }
+    /**
+     * Input: "en.example.com" , "vi.google.com.vn" , "en.com"
+     * Output: "example.com" , "google.com.vn" , "en.com"
+     */
 
     /**
      * Số liệu của từng khối trong sơ đồ kiến trúc crawler — đưa thẳng vào
